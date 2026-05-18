@@ -6,12 +6,13 @@
 import { apiGet, apiPost } from './apiClient';
 import { CurseForgeSearchResult, CurseForgeMod } from '@/types/curseforge';
 import type { BatchVersionResponse } from '@/types/updates';
+import { getCompatStorageItem, removeCompatStorageItem, setCompatStorageItem } from '@/lib/utils/storageCompat';
 
 /**
  * Simple encryption/decryption helper using Web Crypto API
  */
 const StorageHelper = {
-  async encryptData(data: string, password: string = 'simsforge-settings'): Promise<string> {
+  async encryptData(data: string, password: string = 'cccafe-settings'): Promise<string> {
     const encoder = new TextEncoder();
     const data_encoded = encoder.encode(data);
     const password_encoded = encoder.encode(password);
@@ -38,7 +39,7 @@ const StorageHelper = {
     return btoa(binaryString);
   },
 
-  async decryptData(encryptedData: string, password: string = 'simsforge-settings'): Promise<string | null> {
+  async decryptData(encryptedData: string, password: string = 'cccafe-settings'): Promise<string | null> {
     try {
       const encoder = new TextEncoder();
       const password_encoded = encoder.encode(password);
@@ -69,20 +70,20 @@ const StorageHelper = {
 
   setLocal(key: string, value: string): void {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(key, value);
+      setCompatStorageItem(key, value);
     }
   },
 
   getLocal(key: string): string | null {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem(key);
+      return getCompatStorageItem(key);
     }
     return null;
   },
 
   removeLocal(key: string): void {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem(key);
+      removeCompatStorageItem(key);
     }
   }
 };
@@ -92,11 +93,12 @@ const StorageHelper = {
  * @returns The decrypted API key or null if not configured
  */
 async function getCurseForgeApiKey(): Promise<string | null> {
-  const encryptedKey = StorageHelper.getLocal('simsforge_api_key');
+  const encryptedKey = StorageHelper.getLocal('cccafe_api_key');
   if (!encryptedKey) {
     return null;
   }
-  return StorageHelper.decryptData(encryptedKey);
+  const decrypted = await StorageHelper.decryptData(encryptedKey);
+  return decrypted?.trim() || null;
 }
 
 /**
@@ -108,6 +110,7 @@ export interface SearchModsParams {
   pageIndex?: number;
   sortBy?: 'downloads' | 'date' | 'popularity' | 'relevance';
   categoryName?: string;
+  authorId?: number;
 }
 
 /**
@@ -137,6 +140,9 @@ export async function searchCurseForgeMods(
   }
   if (params.categoryName) {
     queryParams.append('categoryName', params.categoryName);
+  }
+  if (params.authorId) {
+    queryParams.append('authorId', params.authorId.toString());
   }
 
   const queryString = queryParams.toString();
@@ -305,3 +311,4 @@ export async function checkModVersions(
 
   return results;
 }
+

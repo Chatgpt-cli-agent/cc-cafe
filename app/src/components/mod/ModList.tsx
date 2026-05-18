@@ -7,6 +7,7 @@ import ModGridRow from '@/components/mod/ModGridRow';
 import { searchCurseForgeMods } from '@/lib/curseforgeApi';
 import { getBatchWarningStatus } from '@/lib/fakeDetectionApi';
 import { userPreferencesService } from '@/lib/services/UserPreferencesService';
+import { getCompatSessionStorageItem, setCompatSessionStorageItem } from '@/lib/utils/storageCompat';
 import { CurseForgeMod } from '@/types/curseforge';
 import { ViewMode } from '@/hooks/useViewMode';
 import { useSearchState } from '@/context/SearchStateContext';
@@ -17,6 +18,7 @@ interface ModListProps {
   searchQuery: string;
   sortBy: 'downloads' | 'date' | 'trending' | 'relevance';
   category?: string;
+  authorId?: number;
   viewMode: ViewMode;
   activeFilter?: 'all' | 'updates' | 'early-access' | 'installed';
   scrollIndex?: number;
@@ -29,9 +31,20 @@ interface PaginationState {
   totalCount: number;
 }
 
-export default function ModList({ searchQuery, sortBy, category, viewMode, activeFilter = 'all', scrollIndex = 0 }: ModListProps) {
+interface CachedSearchResult {
+  mods: CurseForgeMod[];
+  pagination: PaginationState;
+  hasMore: boolean;
+  scrollIndex: number;
+  savedAt: number;
+}
+
+const SEARCH_CACHE_PREFIX = 'cccafe_modlist_cache:';
+const SEARCH_CACHE_TTL = 1000 * 60 * 10;
+
+export default function ModList({ searchQuery, sortBy, category, authorId, viewMode, activeFilter = 'all', scrollIndex = 0 }: ModListProps) {
   const { t } = useTranslation();
-  const searchState = useSearchState();
+  const { resetScrollIndex, setScrollIndex, setCacheKey, setCachedModsCount } = useSearchState();
   const [mods, setMods] = useState<CurseForgeMod[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -51,6 +64,8 @@ export default function ModList({ searchQuery, sortBy, category, viewMode, activ
   const hasRestoredScroll = useRef(false);
   const isRestoring = useRef(false);
   const scrollUpdateTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const normalizedCategory = category ?? '';
 
   // Track previous filter values to detect actual changes vs remounts
   const prevFiltersRef = useRef<{
@@ -97,7 +112,7 @@ export default function ModList({ searchQuery, sortBy, category, viewMode, activ
   }, [mods, gridColumns]);
 
   // Convert UI sort names to API sort names
-  const getSortByForAPI = () => {
+  const apiSortBy = useMemo(() => {
     switch (sortBy) {
       case 'relevance':
         return 'relevance';
@@ -109,10 +124,51 @@ export default function ModList({ searchQuery, sortBy, category, viewMode, activ
       default:
         return 'downloads';
     }
-  };
+  }, [sortBy]);
 
-  // TODO: Implement cache restoration properly
-  // Disabled for now due to dependency issues
+  const searchCacheKey = useMemo(() => {
+    return [
+      searchQuery.trim().toLowerCase(),
+      apiSortBy,
+      normalizedCategory.toLowerCase(),
+      authorId ?? 'all',
+      activeFilter,
+    ].join('|');
+  }, [searchQuery, apiSortBy, normalizedCategory, authorId, activeFilter]);
+
+  const readCachedSearchResult = useCallback((cacheKey: string): CachedSearchResult | null => {
+    try {
+      const raw = getCompatSessionStorageItem(`${SEARCH_CACHE_PREFIX}${cacheKey}`);
+      if (!raw) return null;
+
+      const parsed = JSON.parse(raw) as CachedSearchResult;
+      if (!parsed?.mods || !Array.isArray(parsed.mods)) return null;
+      if (!parsed.savedAt || Date.now() - parsed.savedAt > SEARCH_CACHE_TTL) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const saveCachedSearchResult = useCallback(
+    (cacheKey: string, nextMods: CurseForgeMod[], nextPagination: PaginationState, nextHasMore: boolean) => {
+      try {
+        const payload: CachedSearchResult = {
+          mods: nextMods,
+          pagination: nextPagination,
+          hasMore: nextHasMore,
+          scrollIndex,
+          savedAt: Date.now(),
+        };
+        setCompatSessionStorageItem(`${SEARCH_CACHE_PREFIX}${cacheKey}`, JSON.stringify(payload));
+        setCacheKey(cacheKey);
+        setCachedModsCount(nextMods.length);
+      } catch (error) {
+        console.debug('[ModList] Failed to save search cache', error);
+      }
+    },
+    [scrollIndex, setCacheKey, setCachedModsCount]
+  );
 
   const fetchModsForPage = useCallback(async (pageIndex: number) => {
     if (pageIndex === 0) {
@@ -125,8 +181,9 @@ export default function ModList({ searchQuery, sortBy, category, viewMode, activ
       query: searchQuery || undefined,
       pageSize: 50,
       pageIndex,
-      sortBy: getSortByForAPI() as 'downloads' | 'date' | 'popularity' | 'relevance',
-      categoryName: category || undefined,
+      sortBy: apiSortBy as 'downloads' | 'date' | 'popularity' | 'relevance',
+      categoryName: normalizedCategory || undefined,
+      authorId,
     };
 
     try {
@@ -134,23 +191,23 @@ export default function ModList({ searchQuery, sortBy, category, viewMode, activ
 
       setMods((prev) => (pageIndex === 0 ? result.mods : [...prev, ...result.mods]));
 
-      setPagination({
+      const nextPagination = {
         index: pageIndex,
         pageSize: 50,
         resultCount: result.pagination.resultCount,
         totalCount: result.pagination.totalCount,
-      });
+      };
+
+      setPagination(nextPagination);
 
       // Check if there are more pages
       const loadedCount = (pageIndex + 1) * 50;
-      setHasMore(loadedCount < result.pagination.totalCount);
+      const nextHasMore = loadedCount < result.pagination.totalCount;
+      setHasMore(nextHasMore);
 
-      // TODO: Save first page to cache for future restoration
-      // Disabled for now to prevent infinite re-render loop
-      // Will implement with better state management later
-      // if (pageIndex === 0) {
-      //   saveSearchToCache(...).then(...).catch(...);
-      // }
+      if (pageIndex === 0) {
+        saveCachedSearchResult(searchCacheKey, result.mods, nextPagination, nextHasMore);
+      }
     } catch (err: any) {
       const errorMessage = err.response?.data?.error?.message || err.message || 'Failed to load mods';
       setError(errorMessage);
@@ -162,14 +219,14 @@ export default function ModList({ searchQuery, sortBy, category, viewMode, activ
         setIsLoadingMore(false);
       }
     }
-  }, [searchQuery, sortBy, category, activeFilter]);
+  }, [searchQuery, apiSortBy, normalizedCategory, authorId, saveCachedSearchResult, searchCacheKey]);
 
   // Load first page when query or sort changes
   useEffect(() => {
     const currentFilters = {
       searchQuery,
       sortBy,
-      category: category || '',
+      category: normalizedCategory,
       activeFilter,
     };
 
@@ -195,7 +252,7 @@ export default function ModList({ searchQuery, sortBy, category, viewMode, activ
     // Only reset scroll position when filters ACTUALLY changed (not on mount/remount)
     // This preserves scroll position when navigating back
     if (filtersActuallyChanged) {
-      searchState.resetScrollIndex();
+      resetScrollIndex();
     }
 
     // Save current filters for next comparison
@@ -204,8 +261,18 @@ export default function ModList({ searchQuery, sortBy, category, viewMode, activ
     // Reset scroll restoration flag to allow restoration on next navigation
     hasRestoredScroll.current = false;
 
+    const cached = readCachedSearchResult(searchCacheKey);
+    if (cached) {
+      setMods(cached.mods);
+      setPagination(cached.pagination);
+      setHasMore(cached.hasMore);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     fetchModsForPage(0);
-  }, [searchQuery, sortBy, category || '', activeFilter]);
+  }, [searchQuery, sortBy, normalizedCategory, activeFilter, fetchModsForPage, resetScrollIndex, readCachedSearchResult, searchCacheKey]);
 
   /**
    * Fetch warning statuses for all displayed mods
@@ -302,10 +369,10 @@ export default function ModList({ searchQuery, sortBy, category, viewMode, activ
       }
       // Debounce the scroll index update to avoid excessive state changes
       scrollUpdateTimeout.current = setTimeout(() => {
-        searchState.setScrollIndex(range.startIndex ?? 0);
+        setScrollIndex(range.startIndex ?? 0);
       }, 150);
     },
-    [searchState.setScrollIndex]
+    [setScrollIndex]
   );
 
   // Cleanup timeout on unmount
@@ -420,3 +487,4 @@ export default function ModList({ searchQuery, sortBy, category, viewMode, activ
     </div>
   );
 }
+

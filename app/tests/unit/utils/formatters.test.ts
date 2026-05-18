@@ -102,7 +102,7 @@ describe('formatFileSize', () => {
 
 describe('formatDate', () => {
   it('should format ISO date to full date', () => {
-    const result = formatDate('2025-01-10T00:00:00Z');
+    const result = formatDate('2025-01-10T12:00:00Z');
     expect(result).toContain('January');
     expect(result).toContain('10');
     expect(result).toContain('2025');
@@ -114,7 +114,7 @@ describe('formatDate', () => {
   });
 
   it('should format with en-US locale explicitly', () => {
-    const result = formatDate('2025-01-10T00:00:00Z', 'en-US');
+    const result = formatDate('2025-01-10T12:00:00Z', 'en-US');
     expect(result).toContain('January');
     expect(result).toContain('2025');
   });

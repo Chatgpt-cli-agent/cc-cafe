@@ -1,491 +1,61 @@
 ![banner.png](assets/banner.png)
 
-![Backend Coverage](https://img.shields.io/badge/Coverage_96.4%25-C21325?style=for-the-badge&logo=jest&logoColor=white)
-![Frontend Tests](https://img.shields.io/badge/262_tests_passed-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+CC Café is an open-source Sims 4 mod manager built as a monolithic Electron + Next.js desktop app.
 
-SimsForge is an open-source mod manager for The Sims 4. It provides a desktop application for mod discovery, installation, and management through integration with CurseForge, along with a system for detecting and reporting fake/malicious mods to protect the community.
+## What It Does
 
-## Overview
+- CurseForge browse, creators, downloads, and updates
+- Local mod import and profile management
+- Fake mod detection and reporting
+- S4MM-style tools for duplicate scans, CC package analysis, ID conflict checks, polygon scans, empty folder cleanup, and pack disable commands
+- Sims Log Enabler installation and game log viewing
 
-SimsForge is a full-stack monorepo application featuring:
-
-- **Desktop Application**: Next.js with Tauri for native Windows client
-- **REST API Backend**: Express.js server with PostgreSQL database
-- **CurseForge Integration**: Search, browse, and manage The Sims 4 mods from CurseForge
-- **Fake Mod Detection**: Report and track suspicious/malicious mods with community contributions
-
-## Architecture
+## Repository Layout
 
 ```
-simsforge/
-├── app/                      # Frontend: Next.js 14 + React 18 + Tauri 2
-└── backend/                  # Backend: Express.js + PostgreSQL
+CC Café/
+├── app/       # Electron + Next.js application
+├── assets/    # Repo-level artwork and banner assets
+├── scripts/   # Small repo helpers
+└── updates/   # Update manifest output placeholder
 ```
 
-## Technology Stack
+## Prerequisites
 
-### Frontend (`/app`)
-- **Framework**: Next.js 16.1 with React 19.2
-- **Styling**: Tailwind CSS 4.1 + PostCSS
-- **Desktop**: Tauri 2.9 (Windows MSI bundler)
-- **Language**: TypeScript 5.9
-- **HTTP Client**: Axios 1.13
-- **UI Components**: Phosphor Icons 2.1
-- **i18n**: i18next 24.2 + react-i18next 16.2 + i18next-browser-languagedetector 8.1
-- **Date Formatting**: date-fns 4.1 with locale support
-- **Utilities**: Tailwind Merge, clsx
+- Node.js 18 or newer
+- npm 9 or newer
 
-**Key Features**:
-- Responsive web application
-- Native Windows desktop client
-- **Multi-language support** (English, French, Spanish, Portuguese, Hindi, Russian, Chinese)
-- Mod discovery and search interface
-- Virtual list rendering for performance
-- CurseForge integration for mod browsing
-- **Local mod import** - Import .package, .ts4script, and .zip files from filesystem
-- Real-time game console for viewing Sims 4 logs
-- Auto-installation of Sims Log Enabler mod
-- **Parallel disk operations** with auto-detected concurrency based on disk speed (HDD/SSD/NVMe)
-
-### Backend (`/backend`)
-- **Runtime**: Node.js 18+ with npm 9+
-- **Framework**: Express.js 5.2
-- **Language**: TypeScript 5.9 (strict mode)
-- **Database**: PostgreSQL with Prisma ORM
-- **Validation**: Zod 4.3 schema validation
-- **Logging**: Winston 3.19
-- **Security**: Helmet 8.1, CORS
-
-**Key Services**:
-- Mod metadata and integration with CurseForge API
-- Fake mod detection and reporting system
-- RESTful API for mod discovery and management
-- Tools distribution API for helper mods (Sims Log Enabler)
-
-## Getting Started
-
-### Prerequisites
-
-- **Node.js**: 18.0.0 or higher
-- **npm**: 9.0.0 or higher
-- **PostgreSQL**: 12+ for backend database
-- **Rust** (optional): Required for building the Tauri desktop client
-
-### Installation
-
-Clone the repository:
-```bash
-git clone https://github.com/Teyk0o/simsforge
-cd simsforge
-```
-
-Install dependencies for each package:
+## Setup
 
 ```bash
-# Frontend
 cd app
 npm install
-cd ..
-
-# Backend
-cd backend
-npm install
-cd ..
 ```
 
-### Environment Variables
-
-#### Backend (`/backend/.env`)
-```env
-# Server
-NODE_ENV=development
-PORT=5000
-API_BASE_URL=http://localhost:5000
-
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/simsforge
-
-# CORS
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
-
-# Logging
-LOG_LEVEL=info
-```
-
-#### Frontend (`/app/.env.local`)
-```env
-NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
-```
-
-### Development
-
-#### Running the Backend
-
-```bash
-cd backend
-npm run dev
-```
-
-The API server will start on `http://localhost:5000`.
-
-#### Running the Frontend
+## Development
 
 ```bash
 cd app
 npm run dev
 ```
 
-The development server will start on `http://localhost:3000`.
-
-Or to run the desktop client:
-
-```bash
-cd app
-npm run tauri dev
-```
-
-#### Building the Desktop Client
-
-```bash
-cd app
-npm run build:tauri
-```
-
-This generates a Windows MSI installer in `src-tauri/target/release/bundle/msi/`.
-
-### Database
-
-#### Setting up PostgreSQL
-
-1. Create a new PostgreSQL database:
-```sql
-CREATE DATABASE simsforge;
-```
-
-2. Push the Prisma schema:
-```bash
-cd backend
-npm run db:push
-```
-
-## Project Structure
-
-### Frontend (`/app`)
-
-```
-src/
-├── app/                    # Next.js app directory
-│   ├── library/           # Mod library/browsing
-│   ├── profiles/          # Mod profiles management
-│   ├── settings/          # App settings
-│   └── splash/            # Splash/welcome screen
-├── components/            # Reusable React components
-│   ├── mod/              # Mod browsing components
-│   ├── profile/          # Profile management components
-│   ├── console/          # Game console for real-time logs
-│   ├── layouts/          # Layout components
-│   ├── ui/               # Generic UI components
-│   └── providers/        # Context providers
-├── context/              # React context for state management
-├── hooks/                # Custom React hooks (search, cache, view modes)
-├── i18n/                 # Internationalization configuration and locales
-│   ├── index.ts          # i18next configuration
-│   └── locales/          # Translation files (en-US, fr-FR, es-ES, etc.)
-├── lib/                  # Services (API client, CurseForge, fake detection)
-├── types/                # TypeScript type definitions
-└── src-tauri/            # Tauri desktop application
-    ├── src/              # Rust backend
-    └── tauri.conf.json   # Tauri configuration
-```
-
-### Backend (`/backend`)
-
-```
-src/
-├── config/           # Configuration (database, environment)
-├── controllers/      # Route handlers
-├── services/         # Business logic (CurseForge, fake detection)
-├── routes/           # API route definitions
-├── middleware/       # Express middleware
-├── types/            # TypeScript type definitions
-├── utils/            # Helper utilities (logging, errors)
-└── app.ts            # Express app setup
-```
-
-## Internationalization (i18n)
-
-SimsForge supports multiple languages with automatic language detection based on browser/OS settings.
-
-### Supported Languages
-
-- 🇺🇸 **English (US)** - `en-US` (default)
-- 🇫🇷 **French** - `fr-FR`
-- 🇪🇸 **Spanish** - `es-ES`
-- 🇧🇷 **Portuguese (Brazil)** - `pt-BR`
-- 🇮🇳 **Hindi** - `hi-IN`
-- 🇷🇺 **Russian** - `ru-RU`
-- 🇨🇳 **Chinese (Simplified)** - `zh-CN`
-
-### Features
-
-- **Automatic Language Detection**: Detects user's preferred language from browser/OS settings
-- **Manual Language Selection**: Users can change language in Settings → Application → Language
-- **Persistent Preference**: Language choice is saved in localStorage
-- **Complete Coverage**: All UI text, buttons, messages, and tooltips are translated
-- **No Reload Required**: Language changes apply instantly without page refresh
-
-### Implementation
-
-The i18n system uses `i18next` with:
-- **react-i18next** for React integration
-- **i18next-browser-languagedetector** for automatic language detection
-- Translation files located in `app/src/i18n/locales/`
-- Fallback to English (US) if selected language is unavailable
-
-### Date Localization
-
-Dates throughout the application are automatically localized based on the selected language using **date-fns** with dynamic locale imports for optimal bundle size.
-
-**Features:**
-- **Relative Dates**: "5 days ago", "il y a 5 jours" (dates within 30 days)
-- **Absolute Dates**: "January 10, 2025", "10 janvier 2025" (older dates)
-- **Automatic Loading**: Locale is preloaded when language changes
-- **No Flickering**: Smooth transitions with proper loading states
-- **Tree-shaking**: Only active locale is bundled (~2-5KB per locale)
-
-**Implementation Details:**
-- Hook: `useDateFormatters()` for React components (auto-detects current language)
-- Utilities: `formatRelativeDate()`, `formatDate()` with optional locale parameter
-- Module: `app/src/lib/dateLocales.ts` manages locale caching and dynamic imports
-
-### Adding Translations
-
-Translation files are JSON-based and located in `app/src/i18n/locales/[locale].json`:
-
-```json
-{
-  "common": {
-    "save": "Save",
-    "cancel": "Cancel"
-  },
-  "settings": {
-    "title": "Settings"
-  }
-}
-```
-
-To add a new language:
-1. Create a new locale file: `app/src/i18n/locales/[locale-code].json`
-2. Add the locale to `SUPPORTED_LANGUAGES` in `app/src/i18n/index.ts`
-3. Add language name and flag to `LANGUAGE_NAMES` and `LANGUAGE_FLAGS`
-
-## Features
-
-### Local Mod Import
-
-Import mod files directly from your filesystem into SimsForge's mod management system.
-
-**Supported Formats:**
-- `.package` - Standard Sims 4 mod files
-- `.ts4script` - Script mods
-- `.zip` - Compressed mod archives
-
-**Key Capabilities:**
-- **Multi-file selection** - Import multiple mods at once
-- **Automatic naming** - Extracts mod name from filename with intelligent sanitization
-- **Visual identification** - Each local mod gets a unique colored avatar based on its first letter
-- **Fake mod detection** - ZIP files are analyzed for suspicious content before import
-- **Hash-based deduplication** - Prevents duplicate storage across profiles
-- **Profile integration** - Full support for enable/disable/remove operations
-- **Import progress tracking** - Real-time progress modal with error reporting
-
-**Usage:**
-1. Activate a profile in the sidebar
-2. Click "Import Mods" button in the library header
-3. Select one or more mod files (.package, .ts4script, or .zip)
-4. Review import progress and any errors
-5. Local mods appear in library with colored avatar and "Local" badge
-
-**Technical Details:**
-- Local mods use UUID v4 for unique identification
-- Same deduplication system as CurseForge mods (SHA-256 hashing)
-- Fake detection applies same security analysis as online mods
-- Local mods are excluded from automatic update checks
-- Full i18n support for all 7 languages
-
-## API Documentation
-
-The backend provides a REST API with the following main endpoints:
-
-- **CurseForge Integration**: `/api/v1/curseforge/*` - Mod search, metadata, categories
-- **Fake Mod Detection**: `/api/v1/reports/*` - Report suspicious mods, retrieve detection data
-- **Tools Distribution**: `/api/v1/tools/*` - Download helper tools (Sims Log Enabler)
-
-## Testing
-
-### Backend
-
-The backend has comprehensive unit and integration tests using Jest.
-
-```bash
-cd backend
-
-# Run all tests
-npm test
-
-# Run tests with coverage report
-npm run test:coverage
-
-# Run only unit tests
-npx jest tests/unit
-
-# Run only integration tests
-npx jest tests/integration
-```
-
-**Current Coverage:**
-
-| Metric | Coverage |
-|--------|----------|
-| Statements | 96.54% |
-| Branches | 85.54% |
-| Functions | 96.36% |
-| Lines | 96.40% |
-
-Test suites cover:
-- **Unit tests**: Controllers, services, routes, middleware, utilities
-- **Integration tests**: Full HTTP endpoint testing with mocked dependencies
-
-### Frontend
-
-The frontend uses Vitest with @testing-library/react for unit testing.
-
-```bash
-cd app
-
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run tests with coverage report
-npm run test:coverage
-```
-
-Test suites cover:
-- **Utilities**: Formatters (with localization), path sanitizer, text normalizer, concurrency pool
-- **Hooks**: useDebounce, useDateFormatters (date localization with all 7 languages)
-- **Services**: FakeScoreService, LogEnablerService, GameLogService, DiskPerformanceService, LocalModImportService
-- **Components**: LocalModAvatar, LocalModBadge (local mod UI components)
-- **Date Localization**: dateLocales module (locale imports, caching, fallbacks)
-- **API Client**: Axios instance creation, interceptors, HTTP helpers
-- **i18n**: Translations, language detection, locale loading
-
-**Test Statistics**: 262+ tests covering all frontend modules
-
-## Code Quality
-
-### Linting
-
-```bash
-# Backend
-cd backend
-npm run lint
-
-# Frontend
-cd app
-npm run lint
-```
-
-### Code Formatting
-
-```bash
-# Backend (using Prettier)
-cd backend
-npm run format
-```
-
-## Building for Production
-
-### Frontend (Web)
+## Build
 
 ```bash
 cd app
 npm run build
 ```
 
-### Desktop Client
+## Tests
 
 ```bash
 cd app
-npm run build:tauri
+npm test
+npm run lint
 ```
 
-This creates a Windows MSI installer with the following specifications:
-- **Window Size**: 1280x720 (fixed, non-resizable)
-- **Bundler**: Windows MSI installer
-- **Output**: `src-tauri/target/release/bundle/msi/`
+## Notes
 
-## Development Guidelines
+- The runtime is Electron-based.
+- The top-level `updates/` folder is kept for release artifacts and manifest output.
 
-### Code Standards
-
-- **Language**: English for all code, comments, commits, and documentation
-- **Type Safety**: Full TypeScript strict mode enabled
-- **Code Quality**: ESLint and Prettier enforced across all packages
-
-### Git Workflow
-
-1. Create a feature branch following Conventional Branch Names: `type/scope/description`
-   - Examples: `feat/sheep-ai`, `fix/auth-bug`, `docs/api-guide`
-
-2. Make atomic commits following Conventional Commits:
-   - `feat:` new feature
-   - `fix:` bug fix
-   - `docs:` documentation changes
-   - `test:` adding or updating tests
-   - `refactor:` code restructuring
-   - `perf:` performance improvements
-   - `chore:` build/dependencies/etc
-
-3. Ensure code quality standards before pushing:
-   ```bash
-   npm run lint
-   npm run format
-   ```
-
-4. Submit a pull request with:
-   - Clear description of changes
-   - Reference to any related issues
-   - Test plan and verification steps
-
-## Security
-
-**NEVER TRUST USER INPUT. ALWAYS VALIDATE AND SANITIZE.**
-
-- **API Security**: CORS configuration, helmet security headers for HTTP headers
-- **Input Validation**: Zod schema validation on all user inputs
-- **Database**: PostgreSQL with Prisma ORM providing parameterized queries
-
-## Contributing
-
-1. Follow the [Code Standards](#code-standards) section
-2. Create a feature branch following Conventional Branch Names: `type/scope/description`
-3. Implement your changes
-4. Ensure code quality with linting and formatting
-5. Submit a pull request with detailed description and test plan
-
-## License
-
-This project is licensed under the terms specified in the [LICENSE](LICENSE) file.
-
-## Project Status
-
-SimsForge is in active development.
-
-## Support
-
-For issues, feature requests, or questions:
-1. Review existing issues in the repository
-2. Create a detailed issue report with reproduction steps

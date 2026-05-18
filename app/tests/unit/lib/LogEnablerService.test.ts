@@ -5,29 +5,32 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock Tauri APIs
-vi.mock('@tauri-apps/plugin-http', () => ({
-  fetch: vi.fn(),
-}));
-
-vi.mock('@tauri-apps/plugin-fs', () => ({
-  writeFile: vi.fn(),
-  exists: vi.fn(),
-  remove: vi.fn(),
-  mkdir: vi.fn(),
-}));
-
-vi.mock('@tauri-apps/api/path', () => ({
-  join: vi.fn((...parts: string[]) => Promise.resolve(parts.join('/'))),
-}));
-
 vi.mock('@/lib/apiClient', () => ({
   apiGet: vi.fn(),
 }));
 
-import { fetch } from '@tauri-apps/plugin-http';
-import { writeFile, exists, remove, mkdir } from '@tauri-apps/plugin-fs';
 import { apiGet } from '@/lib/apiClient';
+
+const invoke = vi.mocked(window.electron.ipcRenderer.invoke);
+
+function mockInvoke(defaultExists = true) {
+  invoke.mockImplementation(async (channel: string, ...args: any[]) => {
+    switch (channel) {
+      case 'path:join':
+        return args.join('/');
+      case 'fs:exists':
+        return defaultExists;
+      case 'fs:mkdir':
+      case 'fs:writeFile':
+      case 'fs:remove':
+        return true;
+      case 'tools:get-file':
+        return new Uint8Array([1, 2, 3]);
+      default:
+        return undefined;
+    }
+  });
+}
 
 const mockMetadata = {
   version: '1.0.0',
@@ -42,6 +45,7 @@ describe('LogEnablerService', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    mockInvoke();
   });
 
   describe('getMetadata', () => {
@@ -84,7 +88,11 @@ describe('LogEnablerService', () => {
         success: true,
         data: mockMetadata,
       });
-      (exists as any).mockResolvedValue(true);
+      invoke.mockImplementation(async (channel: string, ...args: any[]) => {
+        if (channel === 'path:join') return args.join('/');
+        if (channel === 'fs:exists') return true;
+        return true;
+      });
 
       const { LogEnablerService } = await import(
         '@/lib/services/LogEnablerService'
@@ -101,9 +109,15 @@ describe('LogEnablerService', () => {
         success: true,
         data: mockMetadata,
       });
-      (exists as any)
-        .mockResolvedValueOnce(true) // first file
-        .mockResolvedValueOnce(false); // second file missing
+      let existsCalls = 0;
+      invoke.mockImplementation(async (channel: string, ...args: any[]) => {
+        if (channel === 'path:join') return args.join('/');
+        if (channel === 'fs:exists') {
+          existsCalls++;
+          return existsCalls === 1;
+        }
+        return true;
+      });
 
       const { LogEnablerService } = await import(
         '@/lib/services/LogEnablerService'
@@ -135,13 +149,7 @@ describe('LogEnablerService', () => {
         success: true,
         data: mockMetadata,
       });
-      (exists as any).mockResolvedValue(true);
-      (mkdir as any).mockResolvedValue(undefined);
-      (fetch as any).mockResolvedValue({
-        ok: true,
-        bytes: () => Promise.resolve(new Uint8Array([1, 2, 3])),
-      });
-      (writeFile as any).mockResolvedValue(undefined);
+      mockInvoke(true);
 
       const { LogEnablerService } = await import(
         '@/lib/services/LogEnablerService'
@@ -151,11 +159,15 @@ describe('LogEnablerService', () => {
       const result = await service.install('/mods');
 
       expect(result.success).toBe(true);
-      expect(writeFile).toHaveBeenCalledTimes(2);
+      expect(invoke).toHaveBeenCalledWith('fs:writeFile', expect.any(String), expect.any(Uint8Array));
     });
 
     it('should return error when mods folder not found', async () => {
-      (exists as any).mockResolvedValue(false);
+      invoke.mockImplementation(async (channel: string, ...args: any[]) => {
+        if (channel === 'path:join') return args.join('/');
+        if (channel === 'fs:exists') return false;
+        return true;
+      });
 
       const { LogEnablerService } = await import(
         '@/lib/services/LogEnablerService'
@@ -168,17 +180,16 @@ describe('LogEnablerService', () => {
       expect(result.error).toContain('Mods folder not found');
     });
 
-    it('should return error when download fails', async () => {
+    it('should return error when packaged tool file cannot be loaded', async () => {
       (apiGet as any).mockResolvedValue({
         success: true,
         data: mockMetadata,
       });
-      (exists as any).mockResolvedValue(true);
-      (mkdir as any).mockResolvedValue(undefined);
-      (fetch as any).mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
+      invoke.mockImplementation(async (channel: string, ...args: any[]) => {
+        if (channel === 'path:join') return args.join('/');
+        if (channel === 'fs:exists') return true;
+        if (channel === 'tools:get-file') return { success: false, error: 'Missing file' };
+        return true;
       });
 
       const { LogEnablerService } = await import(
@@ -189,7 +200,7 @@ describe('LogEnablerService', () => {
       const result = await service.install('/mods');
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Failed to download');
+      expect(result.error).toContain('Missing file');
     });
 
     it('should create install directory if it does not exist', async () => {
@@ -197,15 +208,16 @@ describe('LogEnablerService', () => {
         success: true,
         data: mockMetadata,
       });
-      (exists as any)
-        .mockResolvedValueOnce(true) // mods folder exists
-        .mockResolvedValueOnce(false); // install dir does not exist
-      (mkdir as any).mockResolvedValue(undefined);
-      (fetch as any).mockResolvedValue({
-        ok: true,
-        bytes: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+      let existsCalls = 0;
+      invoke.mockImplementation(async (channel: string, ...args: any[]) => {
+        if (channel === 'path:join') return args.join('/');
+        if (channel === 'fs:exists') {
+          existsCalls++;
+          return existsCalls === 1;
+        }
+        if (channel === 'tools:get-file') return new Uint8Array([1, 2, 3]);
+        return true;
       });
-      (writeFile as any).mockResolvedValue(undefined);
 
       const { LogEnablerService } = await import(
         '@/lib/services/LogEnablerService'
@@ -214,7 +226,7 @@ describe('LogEnablerService', () => {
 
       await service.install('/mods');
 
-      expect(mkdir).toHaveBeenCalledWith('/mods/Sims_Log_Enabler', {
+      expect(invoke).toHaveBeenCalledWith('fs:mkdir', '/mods/Sims_Log_Enabler', {
         recursive: true,
       });
     });
@@ -222,8 +234,7 @@ describe('LogEnablerService', () => {
 
   describe('uninstall', () => {
     it('should remove the install folder', async () => {
-      (exists as any).mockResolvedValue(true);
-      (remove as any).mockResolvedValue(undefined);
+      mockInvoke(true);
 
       const { LogEnablerService } = await import(
         '@/lib/services/LogEnablerService'
@@ -233,13 +244,13 @@ describe('LogEnablerService', () => {
       const result = await service.uninstall('/mods');
 
       expect(result.success).toBe(true);
-      expect(remove).toHaveBeenCalledWith('/mods/Sims_Log_Enabler', {
+      expect(invoke).toHaveBeenCalledWith('fs:remove', '/mods/Sims_Log_Enabler', {
         recursive: true,
       });
     });
 
     it('should succeed when folder does not exist', async () => {
-      (exists as any).mockResolvedValue(false);
+      mockInvoke(false);
 
       const { LogEnablerService } = await import(
         '@/lib/services/LogEnablerService'
@@ -249,12 +260,16 @@ describe('LogEnablerService', () => {
       const result = await service.uninstall('/mods');
 
       expect(result.success).toBe(true);
-      expect(remove).not.toHaveBeenCalled();
+      expect(invoke).not.toHaveBeenCalledWith('fs:remove', expect.any(String), expect.anything());
     });
 
     it('should return error on remove failure', async () => {
-      (exists as any).mockResolvedValue(true);
-      (remove as any).mockRejectedValue(new Error('Permission denied'));
+      invoke.mockImplementation(async (channel: string, ...args: any[]) => {
+        if (channel === 'path:join') return args.join('/');
+        if (channel === 'fs:exists') return true;
+        if (channel === 'fs:remove') throw new Error('Permission denied');
+        return true;
+      });
 
       const { LogEnablerService } = await import(
         '@/lib/services/LogEnablerService'

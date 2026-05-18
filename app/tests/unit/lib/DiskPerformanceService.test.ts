@@ -5,22 +5,46 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DiskPerformanceService } from '@/lib/services/DiskPerformanceService';
 
-// Mock Tauri APIs
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn(),
-}));
+const invoke = vi.mocked(window.electron.ipcRenderer.invoke);
 
-vi.mock('@tauri-apps/plugin-fs', () => ({
-  writeFile: vi.fn(),
-  readFile: vi.fn(),
-  exists: vi.fn(),
-  mkdir: vi.fn(),
-}));
+function mockElectron({
+  configExists = true,
+  config,
+  benchmark,
+}: {
+  configExists?: boolean;
+  config?: unknown;
+  benchmark?: { writeSpeed: number; readSpeed: number; driveType: string };
+} = {}) {
+  invoke.mockImplementation(async (channel: string, ...args: any[]) => {
+    switch (channel) {
+      case 'path:appDataDir':
+        return '/mock/appdata';
+      case 'path:join':
+        return args.join('/');
+      case 'fs:exists':
+        return args[0]?.endsWith('performance.json') ? configExists : true;
+      case 'fs:mkdir':
+      case 'fs:writeFile':
+        return true;
+      case 'fs:readTextFile':
+        return JSON.stringify(config);
+      case 'disk:benchmark':
+        return benchmark ?? { writeSpeed: 500, readSpeed: 700, driveType: 'NVMe' };
+      default:
+        return undefined;
+    }
+  });
+}
 
-vi.mock('@tauri-apps/api/path', () => ({
-  appDataDir: vi.fn().mockResolvedValue('/mock/appdata'),
-  join: vi.fn((...parts: string[]) => Promise.resolve(parts.join('/'))),
-}));
+function configFor(speed: number, poolSize = 5, benchmarkVersion = 2) {
+  return {
+    poolSize,
+    diskSpeedMBps: speed,
+    lastBenchmark: '2025-01-01T00:00:00Z',
+    benchmarkVersion,
+  };
+}
 
 describe('DiskPerformanceService', () => {
   let service: DiskPerformanceService;
@@ -28,14 +52,11 @@ describe('DiskPerformanceService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = new DiskPerformanceService();
+    mockElectron({ configExists: false });
   });
 
   describe('calculatePoolSize (via getPoolSize)', () => {
     it('should return default pool size (5) when not benchmarked', async () => {
-      const { exists } = await import('@tauri-apps/plugin-fs');
-      vi.mocked(exists).mockResolvedValue(true); // SimsForge dir exists
-      vi.mocked(exists).mockResolvedValueOnce(true).mockResolvedValueOnce(false); // config doesn't exist
-
       const poolSize = await service.getPoolSize();
 
       expect(poolSize).toBe(5);
@@ -44,63 +65,27 @@ describe('DiskPerformanceService', () => {
 
   describe('classifyDiskType', () => {
     it('should classify < 100 MB/s as HDD', async () => {
-      const { exists, readFile } = await import('@tauri-apps/plugin-fs');
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockResolvedValue(
-        new TextEncoder().encode(
-          JSON.stringify({
-            poolSize: 3,
-            diskSpeedMBps: 50,
-            lastBenchmark: '2025-01-01T00:00:00Z',
-            benchmarkVersion: 2,
-          })
-        )
-      );
+      mockElectron({ config: configFor(50, 3) });
 
       await service.initialize();
-      const diskType = await service.getDiskType();
 
-      expect(diskType).toBe('hdd');
+      expect(await service.getDiskType()).toBe('hdd');
     });
 
     it('should classify 100-300 MB/s as SSD', async () => {
-      const { exists, readFile } = await import('@tauri-apps/plugin-fs');
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockResolvedValue(
-        new TextEncoder().encode(
-          JSON.stringify({
-            poolSize: 8,
-            diskSpeedMBps: 200,
-            lastBenchmark: '2025-01-01T00:00:00Z',
-            benchmarkVersion: 2,
-          })
-        )
-      );
+      mockElectron({ config: configFor(200, 8) });
 
       await service.initialize();
-      const diskType = await service.getDiskType();
 
-      expect(diskType).toBe('ssd');
+      expect(await service.getDiskType()).toBe('ssd');
     });
 
     it('should classify > 300 MB/s as NVMe', async () => {
-      const { exists, readFile } = await import('@tauri-apps/plugin-fs');
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockResolvedValue(
-        new TextEncoder().encode(
-          JSON.stringify({
-            poolSize: 12,
-            diskSpeedMBps: 900,
-            lastBenchmark: '2025-01-01T00:00:00Z',
-            benchmarkVersion: 2,
-          })
-        )
-      );
+      mockElectron({ config: configFor(900, 12) });
 
       await service.initialize();
-      const diskType = await service.getDiskType();
 
-      expect(diskType).toBe('nvme');
+      expect(await service.getDiskType()).toBe('nvme');
     });
   });
 
@@ -115,96 +100,44 @@ describe('DiskPerformanceService', () => {
 
     testCases.forEach(({ speed, expectedPool, description }) => {
       it(`should return pool size ${expectedPool} for ${description}`, async () => {
-        const { exists, readFile } = await import('@tauri-apps/plugin-fs');
-        vi.mocked(exists).mockResolvedValue(true);
-        vi.mocked(readFile).mockResolvedValue(
-          new TextEncoder().encode(
-            JSON.stringify({
-              poolSize: expectedPool,
-              diskSpeedMBps: speed,
-              lastBenchmark: '2025-01-01T00:00:00Z',
-              benchmarkVersion: 2,
-            })
-          )
-        );
+        mockElectron({ config: configFor(speed, expectedPool) });
 
         await service.initialize();
-        const poolSize = await service.getPoolSize();
 
-        expect(poolSize).toBe(expectedPool);
+        expect(await service.getPoolSize()).toBe(expectedPool);
       });
     });
   });
 
   describe('isFirstRun', () => {
     it('should return true when no config exists', async () => {
-      const { exists } = await import('@tauri-apps/plugin-fs');
-      vi.mocked(exists)
-        .mockResolvedValueOnce(true) // SimsForge dir exists
-        .mockResolvedValueOnce(false); // config doesn't exist
+      mockElectron({ configExists: false });
 
-      const isFirst = await service.isFirstRun();
-
-      expect(isFirst).toBe(true);
+      expect(await service.isFirstRun()).toBe(true);
     });
 
     it('should return false when config exists', async () => {
-      const { exists, readFile } = await import('@tauri-apps/plugin-fs');
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockResolvedValue(
-        new TextEncoder().encode(
-          JSON.stringify({
-            poolSize: 5,
-            diskSpeedMBps: 100,
-            lastBenchmark: '2025-01-01T00:00:00Z',
-            benchmarkVersion: 2,
-          })
-        )
-      );
+      mockElectron({ config: configFor(100, 5) });
 
-      const isFirst = await service.isFirstRun();
-
-      expect(isFirst).toBe(false);
+      expect(await service.isFirstRun()).toBe(false);
     });
   });
 
   describe('config version handling', () => {
     it('should invalidate config with old version', async () => {
-      const { exists, readFile } = await import('@tauri-apps/plugin-fs');
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockResolvedValue(
-        new TextEncoder().encode(
-          JSON.stringify({
-            poolSize: 5,
-            diskSpeedMBps: 100,
-            lastBenchmark: '2025-01-01T00:00:00Z',
-            benchmarkVersion: 1, // Old version
-          })
-        )
-      );
+      mockElectron({ config: configFor(100, 5, 1) });
 
       await service.initialize();
-      const config = await service.getConfig();
 
-      // Config should be null because version doesn't match
-      expect(config).toBeNull();
+      expect(await service.getConfig()).toBeNull();
     });
   });
 
   describe('runBenchmark', () => {
-    it('should call Rust benchmark command and save results', async () => {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const { exists, writeFile, mkdir } = await import('@tauri-apps/plugin-fs');
-
-      vi.mocked(exists)
-        .mockResolvedValueOnce(true) // SimsForge dir exists
-        .mockResolvedValueOnce(false); // config doesn't exist yet
-      vi.mocked(mkdir).mockResolvedValue(undefined);
-      vi.mocked(writeFile).mockResolvedValue(undefined);
-      vi.mocked(invoke).mockResolvedValue({
-        speed_mbps: 500,
-        bytes_written: 262144000,
-        elapsed_ms: 500,
+    it('should call Electron benchmark command and save results', async () => {
+      mockElectron({
+        configExists: false,
+        benchmark: { writeSpeed: 500, readSpeed: 700, driveType: 'NVMe' },
       });
 
       const progressCalls: number[] = [];
@@ -212,31 +145,15 @@ describe('DiskPerformanceService', () => {
         progressCalls.push(progress);
       });
 
-      expect(invoke).toHaveBeenCalledWith('benchmark_disk_speed');
+      expect(invoke).toHaveBeenCalledWith('disk:benchmark', { testPath: '/mock/appdata' });
       expect(config.diskSpeedMBps).toBe(500);
-      expect(config.poolSize).toBe(12); // > 200 MB/s = 12 ops
+      expect(config.poolSize).toBe(12);
       expect(config.benchmarkVersion).toBe(2);
-      expect(writeFile).toHaveBeenCalled();
-    });
-
-    it('should call progress callback during benchmark', async () => {
-      const { invoke } = await import('@tauri-apps/api/core');
-      const { exists, writeFile } = await import('@tauri-apps/plugin-fs');
-
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(writeFile).mockResolvedValue(undefined);
-      vi.mocked(invoke).mockResolvedValue({
-        speed_mbps: 100,
-        bytes_written: 262144000,
-        elapsed_ms: 2500,
-      });
-
-      const progressCalls: number[] = [];
-      await service.runBenchmark((progress) => {
-        progressCalls.push(progress);
-      });
-
-      // Should have progress updates (at least 90 and 100)
+      expect(invoke).toHaveBeenCalledWith(
+        'fs:writeFile',
+        '/mock/appdata/CC Cafe/performance.json',
+        expect.any(String)
+      );
       expect(progressCalls).toContain(90);
       expect(progressCalls).toContain(100);
     });
@@ -244,34 +161,17 @@ describe('DiskPerformanceService', () => {
 
   describe('getDiskSpeed', () => {
     it('should return null when not benchmarked', async () => {
-      const { exists } = await import('@tauri-apps/plugin-fs');
-      vi.mocked(exists)
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(false);
+      mockElectron({ configExists: false });
 
-      const speed = await service.getDiskSpeed();
-
-      expect(speed).toBeNull();
+      expect(await service.getDiskSpeed()).toBeNull();
     });
 
     it('should return speed when benchmarked', async () => {
-      const { exists, readFile } = await import('@tauri-apps/plugin-fs');
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockResolvedValue(
-        new TextEncoder().encode(
-          JSON.stringify({
-            poolSize: 12,
-            diskSpeedMBps: 850,
-            lastBenchmark: '2025-01-01T00:00:00Z',
-            benchmarkVersion: 2,
-          })
-        )
-      );
+      mockElectron({ config: configFor(850, 12) });
 
       await service.initialize();
-      const speed = await service.getDiskSpeed();
 
-      expect(speed).toBe(850);
+      expect(await service.getDiskSpeed()).toBe(850);
     });
   });
 });

@@ -24,7 +24,7 @@ export function useViewMode() {
    * Essential for SSR hydration safety
    */
   useEffect(() => {
-    const stored = localStorage.getItem('simsforge_view_mode');
+    const stored = getCompatStorageItem('cccafe_view_mode');
     if (stored === 'grid' || stored === 'list') {
       setViewMode(stored);
     }
@@ -36,8 +36,9 @@ export function useViewMode() {
    */
   const toggleViewMode = useCallback((mode: ViewMode) => {
     setViewMode(mode);
-    localStorage.setItem('simsforge_view_mode', mode);
+    setCompatStorageItem('cccafe_view_mode', mode);
   }, []);
 
   return { viewMode, toggleViewMode, isLoaded };
 }
+import { getCompatStorageItem, setCompatStorageItem } from '@/lib/utils/storageCompat';

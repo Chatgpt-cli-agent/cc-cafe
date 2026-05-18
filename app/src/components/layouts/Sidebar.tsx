@@ -1,14 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { useProfiles } from '@/context/ProfileContext';
 import { useUpdates } from '@/context/UpdateContext';
-import { MagnifyingGlass, DownloadSimple, UserList, GearSix } from '@phosphor-icons/react';
+import { MagnifyingGlass, DownloadSimple, UserList, GearSix, Toolbox } from '@phosphor-icons/react';
 import ProfileSelector from '@/components/profile/ProfileSelector';
 import UpdateCountBadge from '@/components/update/UpdateCountBadge';
 import { useTranslation } from 'react-i18next';
+import { BRANDING } from '@/lib/branding';
 
 interface SidebarProps {
   onThemeToggle: () => void;
@@ -26,6 +26,7 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
   const getActiveNav = () => {
     if (pathname === '/' || pathname?.startsWith('/mods')) return 'browse';
     if (pathname === '/library') return 'library';
+    if (pathname === '/tools') return 'tools';
     if (pathname === '/profiles') return 'profiles';
     return null;
   };
@@ -46,15 +47,17 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
         }}
       >
         <Link href="/" className="flex items-center h-full">
-          <Image
-            src="/logo.png"
-            alt={t('layout.sidebar.logo_alt')}
-            width={170}
-            height={36}
-            className="hidden lg:block"
-            style={{ maxWidth: '160px', height: 'auto' }}
-            priority
-          />
+          <div className="hidden lg:flex items-center gap-2">
+            <div className="w-8 h-8 text-brand-green flex-shrink-0 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
+                <path d="M12 2L3 11L12 22L21 11L12 2Z" />
+              </svg>
+            </div>
+            <div className="flex items-end gap-1 font-black tracking-tight">
+              <span className="text-[28px] leading-none text-white">CC</span>
+              <span className="text-[28px] leading-none text-brand-green">CAFÉ</span>
+            </div>
+          </div>
           <div className="w-8 h-8 text-brand-green flex-shrink-0 flex items-center justify-center lg:hidden">
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
               <path d="M12 2L3 11L12 22L21 11L12 2Z" />
@@ -93,9 +96,10 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
         {/* Navigation */}
         <nav className="space-y-1">
           {[
-            { id: 'browse', label: t('layout.sidebar.browse'), icon: MagnifyingGlass, href: '/' },
-            { id: 'library', label: t('layout.sidebar.library'), icon: DownloadSimple, href: '/library', badge: updateCount },
-            { id: 'profiles', label: t('layout.sidebar.profiles'), icon: UserList, href: '/profiles' },
+            { id: 'browse', label: BRANDING.sidebar.browse, icon: MagnifyingGlass, href: '/' },
+            { id: 'library', label: BRANDING.sidebar.pantry, icon: DownloadSimple, href: '/library', badge: updateCount },
+            { id: 'tools', label: 'Tools', icon: Toolbox, href: '/tools' },
+            { id: 'profiles', label: BRANDING.sidebar.profiles, icon: UserList, href: '/profiles' },
           ].map(({ id, label, icon: Icon, href, badge }) => {
             const isActive = getActiveNav() === id && !href.includes('filter=updates');
             return (
@@ -151,10 +155,10 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
             e.currentTarget.style.color = 'var(--text-secondary)';
           }}
           aria-label={t('layout.sidebar.settings')}
-          title={t('layout.sidebar.settings')}
+          title={BRANDING.sidebar.settings}
         >
           <GearSix size={20} />
-          <span className="hidden lg:block text-sm font-medium">{t('layout.sidebar.settings')}</span>
+          <span className="hidden lg:block text-sm font-medium">{BRANDING.sidebar.settings}</span>
         </Link>
       </div>
     </aside>

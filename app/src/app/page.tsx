@@ -2,20 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { Spinner, X, Play, Terminal } from '@phosphor-icons/react';
-import { exists } from '@tauri-apps/plugin-fs';
-import { Command } from '@tauri-apps/plugin-shell';
-import { getVersion } from '@tauri-apps/api/app';
-import { Window } from '@tauri-apps/api/window';
 import { useSearchState } from '@/context/SearchStateContext';
 import { useViewMode } from '@/hooks/useViewMode';
 import Layout from '@/components/layouts/Layout';
-import ModList from '@/components/mod/ModList';
-import FilterBar from '@/components/mod/FilterBar';
+import CurseForgeHub from '@/components/curseforge/CurseForgeHub';
 import GameConsole from '@/components/console/GameConsole';
-import { attachConsole } from '@tauri-apps/plugin-log';
 import { userPreferencesService } from '@/lib/services/UserPreferencesService';
 import { gameLogService } from '@/lib/services/GameLogService';
 import { logEnablerService } from '@/lib/services/LogEnablerService';
+import { getCompatStorageItem } from '@/lib/utils/storageCompat';
 import { useTranslation } from 'react-i18next';
 
 type SortOption = 'downloads' | 'date' | 'trending' | 'relevance';
@@ -23,7 +18,7 @@ type FilterChip = 'all' | 'updates' | 'early-access' | 'installed';
 
 // Encryption/decryption helper
 const StorageHelper = {
-  async decryptData(encryptedData: string, password: string = 'simsforge-settings'): Promise<string | null> {
+  async decryptData(encryptedData: string, password: string = 'cccafe-settings'): Promise<string | null> {
     try {
       const encoder = new TextEncoder();
       const password_encoded = encoder.encode(password);
@@ -55,7 +50,7 @@ const StorageHelper = {
 
   getLocal(key: string): string | null {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem(key);
+      return getCompatStorageItem(key);
     }
     return null;
   }
@@ -77,7 +72,6 @@ export default function Home() {
   const [showConsole, setShowConsole] = useState(false);
 
   useEffect(() => {
-    attachConsole();
     setIsMounted(true);
     loadGamePath();
     loadModsPath();
@@ -97,9 +91,8 @@ export default function Home() {
    */
   async function updateWindowTitle() {
     try {
-      const version = await getVersion();
-      const currentWindow = await Window.getCurrent();
-      await currentWindow.setTitle(`SimsForge v${version} - Mod Manager`);
+      const version = await window.electron.ipcRenderer.invoke('app:getVersion');
+      await window.electron.ipcRenderer.invoke('window:setTitle', `CC Café v${version} - Mod Manager`);
     } catch (error) {
       console.error('Failed to update window title:', error);
     }
@@ -132,12 +125,12 @@ export default function Home() {
 
   const loadGamePath = async () => {
     try {
-      const encryptedPath = StorageHelper.getLocal('simsforge_game_path');
+      const encryptedPath = StorageHelper.getLocal('cccafe_game_path');
       if (encryptedPath) {
         const decrypted = await StorageHelper.decryptData(encryptedPath);
         if (decrypted) {
           setGamePath(decrypted);
-          const pathExists = await exists(decrypted);
+          const pathExists = await window.electron.ipcRenderer.invoke('fs:exists', decrypted);
           setGamePathExists(pathExists);
         }
       }
@@ -148,7 +141,7 @@ export default function Home() {
 
   const loadModsPath = async () => {
     try {
-      const encryptedPath = StorageHelper.getLocal('simsforge_mods_path');
+      const encryptedPath = StorageHelper.getLocal('cccafe_mods_path');
       if (encryptedPath) {
         const decrypted = await StorageHelper.decryptData(encryptedPath);
         if (decrypted) {
@@ -200,9 +193,7 @@ export default function Home() {
   const checkProcessRunning = async (processName: string): Promise<boolean> => {
     try {
       const name = processName.replace(/\.exe$/i, '');
-      // @ts-ignore
-      const cmd = new Command('check-process', ['-Command', `Get-Process -Name ${name} -ErrorAction SilentlyContinue`]);
-      const output = await cmd.execute();
+      const output = await window.electron.ipcRenderer.invoke('shell:execute', 'powershell', ['-Command', `Get-Process -Name ${name} -ErrorAction SilentlyContinue`]);
       return output.stdout.trim().length > 0;
     } catch {
       return false;
@@ -219,9 +210,7 @@ export default function Home() {
         await gameLogService.clearLogs(modsPath);
       }
 
-      // @ts-ignore
-      const cmd = new Command('launch-game', ['/c', 'start', '', gamePath]);
-      cmd.spawn();
+      await window.electron.ipcRenderer.invoke('shell:execute', 'cmd', ['/c', 'start', '""', `"${gamePath}"`]);
 
       const processName = getProcessName(gamePath);
       let gameDetected = false;
@@ -415,29 +404,18 @@ export default function Home() {
             )}
           </header>
 
-          {/* Filter Bar */}
           {searchState.isLoaded && (
-            <FilterBar
-                onSortChange={searchState.setActiveSort}
-                activeSort={searchState.activeSort}
-                onFilterChange={searchState.setActiveFilter}
-                activeFilter={searchState.activeFilter}
-                onCategoryChange={searchState.setSelectedCategory}
-                selectedCategory={searchState.selectedCategory}
-                viewMode={viewMode}
-                onViewModeChange={toggleViewMode}
-            />
-          )}
-
-          {/* Mod List */}
-          {searchState.isLoaded && (
-            <ModList
+            <CurseForgeHub
               searchQuery={searchState.searchQuery}
               sortBy={searchState.activeSort}
               category={searchState.selectedCategory}
               viewMode={viewMode}
               activeFilter={searchState.activeFilter}
               scrollIndex={searchState.scrollIndex}
+              onSortChange={searchState.setActiveSort}
+              onFilterChange={searchState.setActiveFilter}
+              onCategoryChange={searchState.setSelectedCategory}
+              onViewModeChange={toggleViewMode}
             />
           )}
         </main>
@@ -454,3 +432,4 @@ export default function Home() {
       </Layout>
   );
 }
+

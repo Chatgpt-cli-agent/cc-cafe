@@ -1,9 +1,8 @@
 /**
  * Frontend service for calculating fake scores and analyzing mods
- * Interacts with Tauri commands for ZIP analysis and machine ID
+ * Interacts with Electron IPC for ZIP analysis and machine ID
  */
 
-import { invoke } from '@tauri-apps/api/core';
 import type { ZipAnalysis, FakeScoreResult } from '@/types/fakeDetection';
 
 /**
@@ -30,13 +29,13 @@ const INFO_ONLY_EXTENSIONS = ['.txt', '.html', '.htm', '.url', '.lnk', '.md', '.
  */
 export class FakeScoreService {
   /**
-   * Analyze ZIP content using Tauri command
+   * Analyze ZIP content using Electron IPC
    *
    * @param zipPath - Full path to the ZIP file
    * @returns Analysis result with file information
    */
   async analyzeZip(zipPath: string): Promise<ZipAnalysis> {
-    return invoke<ZipAnalysis>('analyze_zip_content', { zipPath });
+    return window.electron.ipcRenderer.invoke('zip:analyze', { zipPath });
   }
 
   /**
@@ -46,14 +45,14 @@ export class FakeScoreService {
    * @returns UUID string for this machine
    */
   async getMachineId(): Promise<string> {
-    return invoke<string>('get_or_create_machine_id');
+    return window.electron.ipcRenderer.invoke('app:getMachineId');
   }
 
   /**
    * Calculate fake score based on mod metadata and ZIP analysis
    *
    * @param modTitle - Mod title from CurseForge
-   * @param zipAnalysis - ZIP content analysis from Tauri
+   * @param zipAnalysis - ZIP content analysis from Electron
    * @param downloadCount - Mod download count
    * @param isTrending - Whether mod is marked as trending/popular
    * @returns Score result with reasons

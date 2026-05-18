@@ -15,8 +15,8 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-    title: 'SimsForge - Mod Manager',
-    description: 'Gestion de mods The Sims 4 facilitée',
+    title: 'CC Café - Mod Manager',
+    description: 'Your Sims 4 CC and mods hub',
 };
 
 export default function RootLayout({

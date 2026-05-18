@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
+import { getCompatSessionStorageItem, setCompatSessionStorageItem } from '@/lib/utils/storageCompat';
 
 export type SortOption = 'downloads' | 'date' | 'trending' | 'relevance';
 export type FilterChip = 'all' | 'updates' | 'early-access' | 'installed';
@@ -23,7 +24,7 @@ interface SearchState {
   cachedModsCount?: number;
 }
 
-const STORAGE_KEY = 'simsforge_search_state';
+const STORAGE_KEY = 'cccafe_search_state';
 
 const DEFAULT_STATE: SearchState = {
   searchQuery: '',
@@ -51,7 +52,7 @@ export function useSearchState() {
    */
   useEffect(() => {
     try {
-      const stored = sessionStorage.getItem(STORAGE_KEY);
+      const stored = getCompatSessionStorageItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Partial<SearchState>;
         // Validate that parsed data has the expected shape
@@ -73,7 +74,7 @@ export function useSearchState() {
    */
   useEffect(() => {
     if (isLoaded) {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      setCompatSessionStorageItem(STORAGE_KEY, JSON.stringify(state));
     }
   }, [state, isLoaded]);
 

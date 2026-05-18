@@ -3,8 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Trash, ArrowDown, Pause, Play, FunnelSimple, Export } from '@phosphor-icons/react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
-import { save } from '@tauri-apps/plugin-dialog';
-import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { gameLogService, LogEntry } from '@/lib/services/GameLogService';
 import { useTranslation } from 'react-i18next';
 
@@ -207,7 +205,7 @@ export default function GameConsole({ isOpen, onClose, modsPath, showDebugLogs }
     const defaultName = `sims4-logs-${timestamp}.log`;
 
     // Ask user where to save
-    const filePath = await save({
+    const result = await (window as any).electron.ipcRenderer.invoke('dialog:save', {
       defaultPath: defaultName,
       filters: [
         { name: 'Log Files', extensions: ['log', 'txt'] },
@@ -215,7 +213,8 @@ export default function GameConsole({ isOpen, onClose, modsPath, showDebugLogs }
       ],
     });
 
-    if (!filePath) return; // User cancelled
+    if (result.canceled || !result.filePath) return; // User cancelled
+    const filePath = result.filePath;
 
     // Format logs for export
     const logsToExport = filteredLogs.length > 0 ? filteredLogs : logs;
@@ -225,7 +224,7 @@ export default function GameConsole({ isOpen, onClose, modsPath, showDebugLogs }
 
     // Write to file
     try {
-      await writeTextFile(filePath, content);
+      await (window as any).electron.ipcRenderer.invoke('fs:writeFile', filePath, content);
       console.log(`[GameConsole] Exported ${logsToExport.length} logs to ${filePath}`);
     } catch (error) {
       console.error('[GameConsole] Failed to export logs:', error);

@@ -5,18 +5,9 @@
  * Profiles are stored as JSON files in AppData for fast local access.
  */
 
-import {
-  writeFile,
-  readFile,
-  exists,
-  mkdir,
-  readDir,
-  remove,
-} from '@tauri-apps/plugin-fs';
-import { appDataDir } from '@tauri-apps/api/path';
-import { join } from '@tauri-apps/api/path';
 import { v4 as uuidv4 } from 'uuid';
 import { ModProfile, ProfileMetadata, ProfileMod } from '@/types/profile';
+import { resolveAppDataPath } from './AppPaths';
 
 export class ProfileService {
   private profilesDir: string | null = null;
@@ -32,16 +23,15 @@ export class ProfileService {
     }
 
     try {
-      const appData = await appDataDir();
-      this.profilesDir = await join(appData, 'SimsForge', 'Profiles');
-      this.metadataFile = await join(this.profilesDir, 'profiles.meta.json');
+      this.profilesDir = await resolveAppDataPath('Profiles');
+      this.metadataFile = await window.electron.ipcRenderer.invoke('path:join', this.profilesDir!, 'profiles.meta.json');
 
-      if (!(await exists(this.profilesDir))) {
-        await mkdir(this.profilesDir, { recursive: true });
+      if (!(await window.electron.ipcRenderer.invoke('fs:exists', this.profilesDir))) {
+        await window.electron.ipcRenderer.invoke('fs:mkdir', this.profilesDir, { recursive: true });
       }
 
       // Initialize metadata if not exists
-      if (!(await exists(this.metadataFile))) {
+      if (!(await window.electron.ipcRenderer.invoke('fs:exists', this.metadataFile))) {
         const defaultMetadata: ProfileMetadata = {
           activeProfileId: null,
           profiles: [],
@@ -87,11 +77,12 @@ export class ProfileService {
       };
 
       // Save profile file
-      const profilePath = await join(this.profilesDir!, `${profile.id}.json`);
+      const profilePath = await window.electron.ipcRenderer.invoke('path:join', this.profilesDir!, `${profile.id}.json`);
 
-      await writeFile(
+      await window.electron.ipcRenderer.invoke(
+        'fs:writeFile',
         profilePath,
-        new TextEncoder().encode(JSON.stringify(profile, null, 2))
+        JSON.stringify(profile, null, 2)
       );
 
       // Update metadata
@@ -132,16 +123,15 @@ export class ProfileService {
   async getProfile(profileId: string): Promise<ModProfile | null> {
     await this.ensureInitialized();
 
-    const profilePath = await join(this.profilesDir!, `${profileId}.json`);
+    const profilePath = await window.electron.ipcRenderer.invoke('path:join', this.profilesDir!, `${profileId}.json`);
 
-    if (!(await exists(profilePath))) {
+    if (!(await window.electron.ipcRenderer.invoke('fs:exists', profilePath))) {
       return null;
     }
 
     try {
-      const content = await readFile(profilePath);
-      const decoder = new TextDecoder();
-      return JSON.parse(decoder.decode(content));
+      const content = await window.electron.ipcRenderer.invoke('fs:readTextFile', profilePath);
+      return JSON.parse(content);
     } catch (error) {
       console.error(`Failed to parse profile ${profileId}:`, error);
       return null;
@@ -178,10 +168,11 @@ export class ProfileService {
       updatedAt: new Date().toISOString(),
     };
 
-    const profilePath = await join(this.profilesDir!, `${profileId}.json`);
-    await writeFile(
+    const profilePath = await window.electron.ipcRenderer.invoke('path:join', this.profilesDir!, `${profileId}.json`);
+    await window.electron.ipcRenderer.invoke(
+      'fs:writeFile',
       profilePath,
-      new TextEncoder().encode(JSON.stringify(updatedProfile, null, 2))
+      JSON.stringify(updatedProfile, null, 2)
     );
 
     return updatedProfile;
@@ -201,9 +192,9 @@ export class ProfileService {
     }
 
     // Delete profile file
-    const profilePath = await join(this.profilesDir!, `${profileId}.json`);
-    if (await exists(profilePath)) {
-      await remove(profilePath);
+    const profilePath = await window.electron.ipcRenderer.invoke('path:join', this.profilesDir!, `${profileId}.json`);
+    if (await window.electron.ipcRenderer.invoke('fs:exists', profilePath)) {
+      await window.electron.ipcRenderer.invoke('fs:remove', profilePath);
     }
 
     // Update metadata
@@ -291,10 +282,11 @@ export class ProfileService {
         const profile = await this.getProfile(id);
         if (profile) {
           profile.isActive = id === profileId;
-          const profilePath = await join(this.profilesDir!, `${id}.json`);
-          await writeFile(
+          const profilePath = await window.electron.ipcRenderer.invoke('path:join', this.profilesDir!, `${id}.json`);
+          await window.electron.ipcRenderer.invoke(
+            'fs:writeFile',
             profilePath,
-            new TextEncoder().encode(JSON.stringify(profile, null, 2))
+            JSON.stringify(profile, null, 2)
           );
         }
       })
@@ -343,9 +335,8 @@ export class ProfileService {
 
   private async getMetadata(): Promise<ProfileMetadata> {
     try {
-      const content = await readFile(this.metadataFile!);
-      const decoder = new TextDecoder();
-      return JSON.parse(decoder.decode(content));
+      const content = await window.electron.ipcRenderer.invoke('fs:readTextFile', this.metadataFile!);
+      return JSON.parse(content);
     } catch (error) {
       console.error('Failed to read metadata:', error);
       // Return default if corrupted
@@ -358,15 +349,16 @@ export class ProfileService {
   }
 
   private async saveMetadata(metadata: ProfileMetadata): Promise<void> {
-    await writeFile(
+    await window.electron.ipcRenderer.invoke(
+      'fs:writeFile',
       this.metadataFile!,
-      new TextEncoder().encode(JSON.stringify(metadata, null, 2))
+      JSON.stringify(metadata, null, 2)
     );
   }
 
   private generateRandomColor(): string {
     const colors = [
-      '#46C89B', // SimsForge green
+      '#46C89B', // CC Cafe green
       '#FF6B6B', // Red
       '#4ECDC4', // Teal
       '#FFD93D', // Yellow

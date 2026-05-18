@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurseForgeMod } from '@/lib/curseforgeApi';
@@ -30,29 +30,29 @@ export default function ModDetailClient() {
   const [activeTab, setActiveTab] = useState<TabId>('description');
   const [warningStatus, setWarningStatus] = useState<ModWarningStatus | null>(null);
 
-  useEffect(() => {
-    const fetchMod = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const modData = await getCurseForgeMod(modId);
-        setMod(modData);
-      } catch (err: any) {
-        console.error('[ModDetail] Error fetching mod:', err);
-        setError(
-          err.response?.status === 404
-            ? t('mods.detail.not_found')
-            : err.message || t('mods.detail.error_loading')
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (modId) {
-      fetchMod();
+  const fetchMod = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const modData = await getCurseForgeMod(modId);
+      setMod(modData);
+    } catch (err: any) {
+      console.error('[ModDetail] Error fetching mod:', err);
+      setError(
+        err.response?.status === 404
+          ? t('mods.detail.not_found')
+          : err.message || t('mods.detail.error_loading')
+      );
+    } finally {
+      setIsLoading(false);
     }
-  }, [modId]);
+  }, [modId, t]);
+
+  useEffect(() => {
+    if (modId) {
+      void fetchMod();
+    }
+  }, [modId, fetchMod]);
 
   /**
    * Fetch warning status for the mod (only if fake mod detection is enabled)
@@ -73,7 +73,7 @@ export default function ModDetailClient() {
       }
     };
 
-    fetchWarningStatus();
+    void fetchWarningStatus();
   }, [mod]);
 
   // Loading state

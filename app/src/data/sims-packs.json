@@ -1,0 +1,422 @@
+[
+  {
+    "id": 0,
+    "name": "Expansion Packs",
+    "items": [
+      {
+        "name": "Get to Work",
+        "value": "EP01"
+      },
+      {
+        "name": "Get Together",
+        "value": "EP02"
+      },
+      {
+        "name": "City Living",
+        "value": "EP03"
+      },
+      {
+        "name": "Cats & Dogs",
+        "value": "EP04"
+      },
+      {
+        "name": "Seasons",
+        "value": "EP05"
+      },
+      {
+        "name": "Get Famous",
+        "value": "EP06"
+      },
+      {
+        "name": "Island Living",
+        "value": "EP07"
+      },
+      {
+        "name": "Discover University",
+        "value": "EP08"
+      },
+      {
+        "name": "Eco Lifestyle",
+        "value": "EP09"
+      },
+      {
+        "name": "Snowy Escape",
+        "value": "EP10"
+      },
+      {
+        "name": "Cottage Living",
+        "value": "EP11"
+      },
+      {
+        "name": "High School Years",
+        "value": "EP12"
+      },
+      {
+        "name": "Growing Together",
+        "value": "EP13"
+      },
+      {
+        "name": "Horse Ranch",
+        "value": "EP14"
+      },
+      {
+        "name": "For Rent",
+        "value": "EP15"
+      },
+      {
+        "name": "Lovestruck",
+        "value": "EP16"
+      },
+      {
+        "name": "Life and Death",
+        "value": "EP17"
+      },
+      {
+        "name": "Businesses & Hobbies",
+        "value": "EP18"
+      },
+      {
+        "name": "Enchanted By Nature",
+        "value": "EP19"
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "name": "Game Packs",
+    "items": [
+      {
+        "name": "Outdoor Retreat",
+        "value": "GP01"
+      },
+      {
+        "name": "Spa Day",
+        "value": "GP02"
+      },
+      {
+        "name": "Dine Out",
+        "value": "GP03"
+      },
+      {
+        "name": "Vampires",
+        "value": "GP04"
+      },
+      {
+        "name": "Parenthood",
+        "value": "GP05"
+      },
+      {
+        "name": "Jungle Adventure",
+        "value": "GP06"
+      },
+      {
+        "name": "StrangerVille",
+        "value": "GP07"
+      },
+      {
+        "name": "Realm of Magic",
+        "value": "GP08"
+      },
+      {
+        "name": "Star Wars: Journey to Batuu",
+        "value": "GP09"
+      },
+      {
+        "name": "Dream Home Decorator",
+        "value": "GP10"
+      },
+      {
+        "name": "My Wedding Stories",
+        "value": "GP11"
+      },
+      {
+        "name": "Werewolves",
+        "value": "GP12"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Stuff Packs",
+    "items": [
+      {
+        "name": "Luxury Party Stuff",
+        "value": "SP01"
+      },
+      {
+        "name": "Perfect Patio Stuff",
+        "value": "SP02"
+      },
+      {
+        "name": "Cool Kitchen Stuff",
+        "value": "SP03"
+      },
+      {
+        "name": "Spooky Stuff",
+        "value": "SP04"
+      },
+      {
+        "name": "Movie Hangout Stuff",
+        "value": "SP05"
+      },
+      {
+        "name": "Romantic Garden Stuff",
+        "value": "SP06"
+      },
+      {
+        "name": "Kids Room Stuff",
+        "value": "SP07"
+      },
+      {
+        "name": "Backyard Stuff",
+        "value": "SP08"
+      },
+      {
+        "name": "Vintage Glamour Stuff",
+        "value": "SP09"
+      },
+      {
+        "name": "Bowling Night Stuff",
+        "value": "SP10"
+      },
+      {
+        "name": "Fitness Stuff",
+        "value": "SP11"
+      },
+      {
+        "name": "Toddler Stuff",
+        "value": "SP12"
+      },
+      {
+        "name": "Laundry Day Stuff",
+        "value": "SP13"
+      },
+      {
+        "name": "My First Pet Stuff",
+        "value": "SP14"
+      },
+      {
+        "name": "Moschino Stuff",
+        "value": "SP15"
+      },
+      {
+        "name": "Tiny Living Stuff",
+        "value": "SP16"
+      },
+      {
+        "name": "Nifty Knitting Stuff",
+        "value": "SP17"
+      },
+      {
+        "name": "Paranormal Stuff",
+        "value": "SP18"
+      },
+      {
+        "name": "Home Chef Hustle Stuff",
+        "value": "SP46"
+      },
+      {
+        "name": "Crystal Creations Stuff",
+        "value": "SP49"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Build Kits",
+    "items": [
+      {
+        "name": "Country Kitchen Kit",
+        "value": "SP21"
+      },
+      {
+        "name": "Courtyard Oasis Kit",
+        "value": "SP23"
+      },
+      {
+        "name": "Industrial Loft Kit",
+        "value": "SP25"
+      },
+      {
+        "name": "Blooming Rooms Kit",
+        "value": "SP29"
+      },
+      {
+        "name": "Decor to the Max Kit",
+        "value": "SP31"
+      },
+      {
+        "name": "Little Campers Kit",
+        "value": "SP33"
+      },
+      {
+        "name": "Desert Luxe Kit",
+        "value": "SP35"
+      },
+      {
+        "name": "Pastel Pop Kit",
+        "value": "SP36"
+      },
+      {
+        "name": "Everyday Clutter Kit",
+        "value": "SP37"
+      },
+      {
+        "name": "Bathroom Clutter Kit",
+        "value": "SP39"
+      },
+      {
+        "name": "Greenhouse Haven Kit",
+        "value": "SP40"
+      },
+      {
+        "name": "Basement Treasures Kit",
+        "value": "SP41"
+      },
+      {
+        "name": "Book Nook Kit",
+        "value": "SP43"
+      },
+      {
+        "name": "Modern Luxe Kit",
+        "value": "SP45"
+      },
+      {
+        "name": "Castle Estate Kit",
+        "value": "SP47"
+      },
+      {
+        "name": "Party Essentials Kit",
+        "value": "SP51"
+      },
+      {
+        "name": "Riviera Retreat Kit",
+        "value": "SP52"
+      },
+      {
+        "name": "Cozy Bistro Kit",
+        "value": "SP53"
+      },
+      {
+        "name": "Storybook Nursery Kit",
+        "value": "SP55"
+      },
+      {
+        "name": "Artist Studio Kit",
+        "value": "SP54"
+      },
+      {
+        "name": "Cozy Kitsch Kit",
+        "value": "SP57"
+      },
+      {
+        "name": "Comfy Gamer Kit",
+        "value": "SP58"
+      },
+      {
+        "name": "Refined Living Room Kit",
+        "value": "SP61"
+      },
+      {
+        "name": "Sleek Bathroom Kit",
+        "value": "SP63"
+      },
+      {
+        "name": "Restoration Workshop Kit",
+        "value": "SP65"
+      },
+      {
+        "name": "Kitchen Clutter Kit",
+        "value": "SP67"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "name": "Create a Sim Kits",
+    "items": [
+      {
+        "name": "Throwback Fit Kit",
+        "value": "SP20"
+      },
+      {
+        "name": "Fashion Street Kit",
+        "value": "SP24"
+      },
+      {
+        "name": "Incheon Arrivals Kit",
+        "value": "SP26"
+      },
+      {
+        "name": "Modern Menswear Kit",
+        "value": "SP28"
+      },
+      {
+        "name": "Carnaval Streetwear Kit",
+        "value": "SP30"
+      },
+      {
+        "name": "Moonlight Chic Kit",
+        "value": "SP32"
+      },
+      {
+        "name": "First Fits Kit",
+        "value": "SP34"
+      },
+      {
+        "name": "Simtimates Collection Kit",
+        "value": "SP38"
+      },
+      {
+        "name": "Grunge Revival Kit",
+        "value": "SP42"
+      },
+      {
+        "name": "Poolside Splash Kit",
+        "value": "SP44"
+      },
+      {
+        "name": "Goth Galore Kit",
+        "value": "SP48"
+      },
+      {
+        "name": "Urban Homage Kit",
+        "value": "SP50"
+      },
+      {
+        "name": "Sweet Slumber Party Kit",
+        "value": "SP56"
+      },
+      {
+        "name": "Business Chic Kit",
+        "value": "SP62"
+      },
+      {
+        "name": "Sweet Allure Kit",
+        "value": "SP64"
+      },
+      {
+        "name": "Golden Years Kit",
+        "value": "SP66"
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "name": "Other Kits",
+    "items": [
+      {
+        "name": "Bust the Dust Kit",
+        "value": "SP22"
+      },
+      {
+        "name": "Secret Sanctuary Kit",
+        "value": "SP59"
+      },
+      {
+        "name": "Casanova Cave Kit",
+        "value": "SP60"
+      }
+    ]
+  }
+]

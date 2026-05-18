@@ -43,7 +43,7 @@
   },
   "layout": {
     "sidebar": {
-      "logo_alt": "SimsForge",
+      "logo_alt": "CC Café",
       "active_profile": "Perfil Ativo",
       "browse": "Explorar",
       "library": "Biblioteca",
@@ -163,12 +163,12 @@
       "description": "Configurações gerais da aplicação.",
       "language": {
         "title": "Idioma",
-        "description": "Escolha o idioma de exibição do SimsForge."
+        "description": "Escolha o idioma de exibição do CC Café."
       }
     },
     "game_location": {
       "title": "Local do Jogo",
-      "description": "Defina onde o SimsForge deve procurar sua instalação e mods.",
+      "description": "Defina onde o CC Café deve procurar sua instalação e mods.",
       "game_executable": "Executável do The Sims 4",
       "mods_folder": "Pasta de Mods",
       "game_detected": "Jogo detectado com sucesso",
@@ -194,7 +194,7 @@
     },
     "mod_preferences": {
       "title": "Preferências de Mods",
-      "description": "Configure como o SimsForge gerencia seus mods instalados.",
+      "description": "Configure como o CC Café gerencia seus mods instalados.",
       "auto_updates": {
         "title": "Atualizações automáticas",
         "description": "Baixe e instale atualizações de mods assim que disponíveis."
@@ -213,7 +213,7 @@
       "description": "Opções adicionais para solução de problemas e diagnósticos.",
       "game_logging": {
         "title": "Log do jogo",
-        "description_1": "Ative visualização de log em tempo real do The Sims 4. O SimsForge instalará automaticamente o",
+        "description_1": "Ative visualização de log em tempo real do The Sims 4. O CC Café instalará automaticamente o",
         "link_text": "mod Sims Log Enabler",
         "description_2": "quando ativado."
       },
@@ -238,7 +238,7 @@
       "title": "Zona de Perigo",
       "description": "Ações irreversíveis para redefinir ou limpar dados do aplicativo.",
       "clear_cache": {
-        "title": "Limpar cache do SimsForge",
+        "title": "Limpar cache do CC Café",
         "description": "Pode resolver imagens ausentes ou downloads bloqueados.",
         "button": "Limpar cache",
         "clearing": "Limpando...",

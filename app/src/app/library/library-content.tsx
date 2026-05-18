@@ -19,6 +19,7 @@ import { LocalModBadge } from './components/LocalModBadge';
 import { ImportProgressModal } from './components/ImportProgressModal';
 import { localModImportService } from '@/lib/services/LocalModImportService';
 import type { ImportSummary } from '@/lib/services/LocalModImportService';
+import { BRANDING } from '@/lib/branding';
 
 /**
  * Library content component that handles displaying and managing mods
@@ -26,7 +27,7 @@ import type { ImportSummary } from '@/lib/services/LocalModImportService';
 export default function LibraryContent() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
-  const { activeProfile, isLoading, toggleModInProfile, removeModFromProfile } =
+  const { activeProfile, isLoading, toggleModInProfile, removeModFromProfile, refreshProfiles } =
     useProfiles();
   const { hasUpdate, updateMod, updateAllMods, updateCount, isUpdating, isChecking, checkForUpdates } = useUpdates();
 
@@ -267,7 +268,7 @@ export default function LibraryContent() {
             className="text-xl font-bold"
             style={{ color: 'var(--text-primary)' }}
           >
-            {t('library.title')}
+            {BRANDING.library.title}
           </h1>
           <ImportModsButton
             disabled={!activeProfile || isLoading}
@@ -290,7 +291,7 @@ export default function LibraryContent() {
               }}
             >
               <ArrowCircleUp size={18} weight={isUpdating ? 'regular' : 'fill'} />
-              {isUpdating ? t('library.updating') : t('library.update_all', { count: updateCount })}
+              {isUpdating ? t('library.updating') : BRANDING.library.updateAll}
             </button>
           )}
 
@@ -453,7 +454,7 @@ export default function LibraryContent() {
             title={t('library.check_updates')}
           >
             <ArrowsClockwise size={16} className={isChecking ? 'animate-spin' : ''} />
-            <span className="hidden md:inline">{isChecking ? t('library.checking') : t('library.check_updates')}</span>
+            <span className="hidden md:inline">{isChecking ? t('library.checking') : BRANDING.library.checkUpdates}</span>
           </button>
         </section>
       )}
@@ -590,7 +591,7 @@ export default function LibraryContent() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            handleUpdateMod(mod.modId);
+                            handleUpdateMod(mod.modId as number);
                           }}
                           disabled={isUpdating || updatingModId === mod.modId}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors"

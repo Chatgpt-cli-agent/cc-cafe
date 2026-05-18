@@ -49,14 +49,22 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [modsPath, setModsPath] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  /**
-   * Initialize services and load profiles on mount
-   */
-  useEffect(() => {
-    initializeProfiles();
+  const refreshProfiles = useCallback(async () => {
+    try {
+      const allProfiles = await profileService.getAllProfiles();
+      setProfiles(allProfiles);
+
+      const active = await profileService.getActiveProfile();
+      setActiveProfile(active);
+
+      setError(null);
+    } catch (error: any) {
+      console.error('Failed to refresh profiles:', error);
+      setError(error.message);
+    }
   }, []);
 
-  const initializeProfiles = async () => {
+  const initializeProfiles = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -88,25 +96,14 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
       setIsInitialized(true);
     }
-  };
+  }, [refreshProfiles, showToast]);
 
   /**
-   * Refresh profiles list and active profile
+   * Initialize services and load profiles on mount
    */
-  const refreshProfiles = useCallback(async () => {
-    try {
-      const allProfiles = await profileService.getAllProfiles();
-      setProfiles(allProfiles);
-
-      const active = await profileService.getActiveProfile();
-      setActiveProfile(active);
-
-      setError(null);
-    } catch (error: any) {
-      console.error('Failed to refresh profiles:', error);
-      setError(error.message);
-    }
-  }, []);
+  useEffect(() => {
+    void initializeProfiles();
+  }, [initializeProfiles]);
 
   /**
    * Create a new profile

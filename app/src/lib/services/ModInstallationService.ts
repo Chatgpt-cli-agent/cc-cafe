@@ -1,20 +1,10 @@
-// typescript
 /**
- * Mod Installation Service (Tauri-based)
+ * Mod Installation Service (Electron-based)
  *
- * Handles downloading and installing mods locally using Tauri APIs
+ * Handles downloading and installing mods locally using Electron IPC
  */
 
-import { fetch } from '@tauri-apps/plugin-http';
-import {
-  writeFile,
-  exists,
-  mkdir,
-  readDir,
-  remove,
-} from '@tauri-apps/plugin-fs';
 import { getModDownloadUrl, getCurseForgeMod } from '@/lib/curseforgeApi';
-import { join, basename } from '@tauri-apps/api/path';
 import { modCacheService } from './ModCacheService';
 import { profileService } from './ProfileService';
 import { symlinkService } from './SymlinkService';
@@ -53,7 +43,7 @@ export interface InstallationResult {
 }
 
 /**
- * Service for downloading and installing mods using Tauri
+ * Service for downloading and installing mods using Electron
  */
 export class ModInstallationService {
   /**
@@ -105,10 +95,11 @@ export class ModInstallationService {
         // Continue with defaults if fetch fails
       }
 
-      const tempDir = await join(await this.getTempDir(), `mod_${modId}_${Date.now()}`);
-      await mkdir(tempDir, { recursive: true });
+      const appDataDir = await window.electron.ipcRenderer.invoke('path:appDataDir');
+      const tempDir = await window.electron.ipcRenderer.invoke('path:join', appDataDir, 'temp', 'downloads', `mod_${modId}_${Date.now()}`);
+      await window.electron.ipcRenderer.invoke('fs:mkdir', tempDir, { recursive: true });
 
-      const tempFilePath = await join(tempDir, fileName);
+      const tempFilePath = await window.electron.ipcRenderer.invoke('path:join', tempDir, fileName);
 
       // Start smooth progress simulation during download
       const downloadStartTime = Date.now();
@@ -133,18 +124,17 @@ export class ModInstallationService {
 
       startProgressSimulation();
 
-      // Use fetchWithRedirects to follow 3xx redirects (ex. 302) and return the final response + URL
-      const { response, finalUrl } = await this.fetchWithRedirects(downloadUrl, {
+      // Download file using IPC http:fetch
+      const fetchResult = await window.electron.ipcRenderer.invoke('http:fetch', downloadUrl, {
         method: 'GET',
-        connectTimeout: 60000,
-        redirect: 'follow',
-      }, 5);
+        responseType: 'arraybuffer',
+      });
 
-      if (!response.ok) {
-        throw new Error(`Download failed with status ${response.status}: ${response.statusText}`);
+      if (!fetchResult.ok) {
+        throw new Error(`Download failed with status ${fetchResult.status}: ${fetchResult.statusText}`);
       }
 
-      const fileBytes = await response.bytes();
+      const fileBytes = fetchResult.data;
 
       // Stop progress simulation
       if (progressInterval) {
@@ -158,7 +148,7 @@ export class ModInstallationService {
         message: `Downloaded ${fileName}`,
       });
 
-      await writeFile(tempFilePath, fileBytes);
+      await window.electron.ipcRenderer.invoke('fs:writeFile', tempFilePath, fileBytes);
 
       // Analyze ZIP for fake mod detection if callback provided
       if (onFakeDetection) {
@@ -258,7 +248,7 @@ export class ModInstallationService {
 
       // If modsPath is provided, activate all profile mods (not just the new one)
       let installedFiles: string[] = [];
-      if (modsPath && (await exists(modsPath))) {
+      if (modsPath && (await window.electron.ipcRenderer.invoke('fs:exists', modsPath))) {
         onProgress?.({
           stage: 'installing',
           percent: 85,
@@ -286,10 +276,10 @@ export class ModInstallationService {
           // Don't fail - mods are in cache and profile
         }
 
-        installedFiles = cachedMod.files.map((f) => f.fileName);
+        installedFiles = cachedMod.files.map((f: any) => f.fileName);
       } else {
         // If modsPath not provided, just return the cached files
-        installedFiles = cachedMod.files.map((f) => f.fileName);
+        installedFiles = cachedMod.files.map((f: any) => f.fileName);
       }
 
       await this.cleanupTempDir(tempDir);
@@ -329,47 +319,8 @@ export class ModInstallationService {
   }
 
   /**
-   * Helper: fetch and follow 3xx redirects up to maxRedirects.
-   * Retourne l'objet response final et l'URL finale suivie.
-   */
-  private async fetchWithRedirects(initialUrl: string, options: any = {}, maxRedirects = 5): Promise<{ response: any; finalUrl: string }> {
-    let currentUrl = initialUrl;
-
-    for (let i = 0; i <= maxRedirects; i++) {
-      const resp = await fetch(currentUrl, options);
-
-      if (resp.status >= 300 && resp.status < 400) {
-        const headers: any = (resp as any).headers;
-        let location =
-            typeof headers?.get === 'function'
-                ? headers.get('location')
-                : headers?.location ?? headers?.['location'];
-
-        if (!location) {
-          throw new Error(`Redirected (${resp.status}) but no Location header found`);
-        }
-
-        // Resolve relative redirects against the current URL
-        try {
-          location = new URL(location, currentUrl).toString();
-        } catch {
-          // keep raw location if URL parsing fails
-        }
-
-        currentUrl = location;
-        // continue the loop to fetch the new URL
-        continue;
-      }
-
-      // not a redirect, return
-      return { response: resp, finalUrl: currentUrl };
-    }
-
-    throw new Error('Too many redirects while trying to download file');
-  }
-
-  /**
    * Install a .zip mod file (extract and find .package files)
+   * Note: This is now largely handled by modCacheService.addToCache
    */
   private async installZipMod(
       zipPath: string,
@@ -378,10 +329,10 @@ export class ModInstallationService {
       onProgress?: ProgressCallback
   ): Promise<string[]> {
     const sanitizedModName = sanitizeModName(modName);
-    const modFolder = await join(modsPath, sanitizedModName);
+    const modFolder = await window.electron.ipcRenderer.invoke('path:join', modsPath, sanitizedModName);
 
-    if (!(await exists(modFolder))) {
-      await mkdir(modFolder, { recursive: true });
+    if (!(await window.electron.ipcRenderer.invoke('fs:exists', modFolder))) {
+      await window.electron.ipcRenderer.invoke('fs:mkdir', modFolder, { recursive: true });
     }
 
     onProgress?.({
@@ -390,7 +341,7 @@ export class ModInstallationService {
       message: 'Extracting files...',
     });
 
-    const extractedFiles = await this.extractZip(zipPath, modFolder);
+    await this.extractZip(zipPath, modFolder);
 
     const packageFiles = await this.findPackageFiles(modFolder);
 
@@ -404,17 +355,17 @@ export class ModInstallationService {
   }
 
   /**
-   * Extract a zip file using Tauri invoke
+   * Extract a zip file using Electron IPC
    */
   private async extractZip(zipPath: string, destDir: string): Promise<void> {
-
-    const { invoke } = await import('@tauri-apps/api/core');
-
     try {
-      await invoke('extract_zip', {
+      const result = await window.electron.ipcRenderer.invoke('extract-zip', {
         zipPath,
         destDir,
       });
+      if (!result.success) {
+        throw new Error(result.error);
+      }
     } catch (error) {
       console.error('[ModInstallationService] Failed to extract zip:', error);
       throw new Error(`Failed to extract zip: ${error}`);
@@ -428,10 +379,10 @@ export class ModInstallationService {
     const results: string[] = [];
 
     try {
-      const entries = await readDir(dir);
+      const entries = await window.electron.ipcRenderer.invoke('fs:readDir', dir);
 
       for (const entry of entries) {
-        const fullPath = await join(dir, entry.name);
+        const fullPath = await window.electron.ipcRenderer.invoke('path:join', dir, entry.name);
 
         if (entry.isDirectory) {
           const subResults = await this.findPackageFiles(fullPath);
@@ -448,20 +399,11 @@ export class ModInstallationService {
   }
 
   /**
-   * Get temp directory for downloads
-   */
-  private async getTempDir(): Promise<string> {
-    const { appDataDir } = await import('@tauri-apps/api/path');
-    const appData = await appDataDir();
-    return await join(appData, 'temp', 'downloads');
-  }
-
-  /**
    * Cleanup temp directory
    */
   private async cleanupTempDir(tempDir: string): Promise<void> {
     try {
-      await remove(tempDir, { recursive: true });
+      await window.electron.ipcRenderer.invoke('fs:remove', tempDir, { recursive: true });
     } catch (error) {
       console.error('Failed to cleanup temp dir:', error);
     }

@@ -1,19 +1,15 @@
 /**
- * Local Mod Import Service
+ * Local Mod Import Service (Electron-based)
  *
  * Handles importing local mod files (.package, .ts4script, .zip) from the filesystem
- * and integrating them into SimsForge's mod management system with fake detection
+ * and integrating them into CC Café's mod management system with fake detection
  */
 
-import { open } from '@tauri-apps/plugin-dialog';
-import { writeFile, readFile, exists, mkdir, remove } from '@tauri-apps/plugin-fs';
-import { join, basename } from '@tauri-apps/api/path';
-import { appDataDir } from '@tauri-apps/api/path';
-import { invoke } from '@tauri-apps/api/core';
 import { v4 as uuidv4 } from 'uuid';
 import { modCacheService } from './ModCacheService';
 import { profileService } from './ProfileService';
 import { fakeScoreService } from './FakeScoreService';
+import { resolveAppDataPath } from './AppPaths';
 import type { ProfileMod } from '@/types/profile';
 import type { FakeScoreResult, ZipAnalysis } from '@/types/fakeDetection';
 
@@ -58,7 +54,7 @@ export interface ImportSummary {
 }
 
 /**
- * Service for importing local mod files
+ * Service for importing local mod files using Electron
  */
 export class LocalModImportService {
   private readonly VALID_EXTENSIONS = ['.package', '.ts4script', '.zip'];
@@ -80,9 +76,9 @@ export class LocalModImportService {
       throw new Error('No active profile selected');
     }
 
-    // Open file picker with multi-select
-    const selected = await open({
-      multiple: true,
+    // Open file picker with multi-select using Electron IPC
+    const result = await window.electron.ipcRenderer.invoke('dialog:open', {
+      properties: ['openFile', 'multiSelections'],
       filters: [
         {
           name: 'Sims 4 Mods',
@@ -91,7 +87,7 @@ export class LocalModImportService {
       ],
     });
 
-    if (!selected || (Array.isArray(selected) && selected.length === 0)) {
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
       return {
         total: 0,
         successful: 0,
@@ -101,7 +97,7 @@ export class LocalModImportService {
       };
     }
 
-    const filePaths = Array.isArray(selected) ? selected : [selected];
+    const filePaths = result.filePaths;
     const summary: ImportSummary = {
       total: filePaths.length,
       successful: 0,
@@ -113,7 +109,7 @@ export class LocalModImportService {
     // Process each file
     for (let i = 0; i < filePaths.length; i++) {
       const filePath = filePaths[i];
-      const fileName = await basename(filePath);
+      const fileName = await window.electron.ipcRenderer.invoke('path:basename', filePath);
 
       onProgress?.({
         stage: 'analyzing',
@@ -123,21 +119,21 @@ export class LocalModImportService {
       });
 
       try {
-        const result = await this.processModFile(
+        const processResult = await this.processModFile(
           filePath,
           fileName,
           activeProfile.id,
           onFakeDetection
         );
 
-        if (result.success && result.profileMod) {
+        if (processResult.success && processResult.profileMod) {
           summary.successful++;
-          summary.importedMods.push(result.profileMod);
+          summary.importedMods.push(processResult.profileMod);
         } else {
           summary.failed++;
           summary.errors.push({
-            fileName: result.fileName,
-            error: result.error || 'Unknown error',
+            fileName: processResult.fileName,
+            error: processResult.error || 'Unknown error',
           });
         }
       } catch (error) {
@@ -184,12 +180,12 @@ export class LocalModImportService {
 
     // Create temp directory for processing
     const tempDir = await this.createTempDir();
-    const tempFilePath = await join(tempDir, fileName);
+    const tempFilePath = await window.electron.ipcRenderer.invoke('path:join', tempDir, fileName);
 
     try {
       // Copy file to temp directory
-      const fileBytes = await readFile(filePath);
-      await writeFile(tempFilePath, fileBytes);
+      const fileBytes = await window.electron.ipcRenderer.invoke('fs:readFile', filePath);
+      await window.electron.ipcRenderer.invoke('fs:writeFile', tempFilePath, fileBytes);
 
       // For .zip files, perform fake detection
       const isZipFile = fileName.toLowerCase().endsWith('.zip');
@@ -295,11 +291,10 @@ export class LocalModImportService {
    * @returns Path to temp directory
    */
   private async createTempDir(): Promise<string> {
-    const appData = await appDataDir();
     const timestamp = Date.now();
-    const tempDir = await join(appData, 'SimsForge', 'temp', 'imports', `import_${timestamp}`);
+    const tempDir = await resolveAppDataPath('temp', 'imports', `import_${timestamp}`);
 
-    await mkdir(tempDir, { recursive: true });
+    await window.electron.ipcRenderer.invoke('fs:mkdir', tempDir, { recursive: true });
     return tempDir;
   }
 
@@ -310,8 +305,8 @@ export class LocalModImportService {
    */
   private async cleanupTemp(tempDir: string): Promise<void> {
     try {
-      if (await exists(tempDir)) {
-        await remove(tempDir, { recursive: true });
+      if (await window.electron.ipcRenderer.invoke('fs:exists', tempDir)) {
+        await window.electron.ipcRenderer.invoke('fs:remove', tempDir, { recursive: true });
       }
     } catch (error) {
       console.warn('[LocalModImportService] Failed to cleanup temp directory:', error);

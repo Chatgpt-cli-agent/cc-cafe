@@ -5,29 +5,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LocalModImportService } from '@/lib/services/LocalModImportService';
 
-// Mock Tauri APIs
-vi.mock('@tauri-apps/plugin-dialog', () => ({
-  open: vi.fn(),
-}));
-
-vi.mock('@tauri-apps/plugin-fs', () => ({
-  readFile: vi.fn(),
-  writeFile: vi.fn(),
-  exists: vi.fn(),
-  mkdir: vi.fn(),
-  remove: vi.fn(),
-}));
-
-vi.mock('@tauri-apps/api/path', () => ({
-  join: vi.fn((...args: string[]) => args.join('/')),
-  basename: vi.fn((path: string) => path.split('/').pop() || ''),
-  appDataDir: vi.fn(() => Promise.resolve('/mock/appdata')),
-}));
-
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn(),
-}));
-
 // Mock services
 vi.mock('@/lib/services/ModCacheService', () => ({
   modCacheService: {
@@ -49,11 +26,47 @@ vi.mock('@/lib/services/FakeScoreService', () => ({
   },
 }));
 
-import { open } from '@tauri-apps/plugin-dialog';
-import { readFile, writeFile, exists, mkdir, remove } from '@tauri-apps/plugin-fs';
 import { modCacheService } from '@/lib/services/ModCacheService';
 import { profileService } from '@/lib/services/ProfileService';
 import { fakeScoreService } from '@/lib/services/FakeScoreService';
+
+const invoke = vi.mocked(window.electron.ipcRenderer.invoke);
+
+function mockElectron({
+  filePaths = [],
+  canceled = false,
+  fileExists = true,
+  readFileError,
+}: {
+  filePaths?: string[];
+  canceled?: boolean;
+  fileExists?: boolean;
+  readFileError?: Error;
+} = {}) {
+  invoke.mockImplementation(async (channel: string, ...args: any[]) => {
+    switch (channel) {
+      case 'dialog:open':
+        return { canceled, filePaths };
+      case 'path:basename':
+        return String(args[0]).split(/[\\/]/).pop() || '';
+      case 'path:appDataDir':
+        return '/mock/appdata';
+      case 'path:join':
+        return args.join('/');
+      case 'fs:exists':
+        return fileExists;
+      case 'fs:readFile':
+        if (readFileError) throw readFileError;
+        return new Uint8Array([1, 2, 3]);
+      case 'fs:writeFile':
+      case 'fs:mkdir':
+      case 'fs:remove':
+        return true;
+      default:
+        return undefined;
+    }
+  });
+}
 
 describe('LocalModImportService', () => {
   let service: LocalModImportService;
@@ -61,6 +74,7 @@ describe('LocalModImportService', () => {
   beforeEach(() => {
     service = new LocalModImportService();
     vi.clearAllMocks();
+    mockElectron();
   });
 
   afterEach(() => {
@@ -182,7 +196,7 @@ describe('LocalModImportService', () => {
     });
 
     it('should return empty summary when no files selected', async () => {
-      vi.mocked(open).mockResolvedValue(null);
+      mockElectron({ canceled: true });
 
       const result = await service.importModFiles();
 
@@ -196,7 +210,7 @@ describe('LocalModImportService', () => {
     });
 
     it('should return empty summary when empty array selected', async () => {
-      vi.mocked(open).mockResolvedValue([]);
+      mockElectron({ filePaths: [] });
 
       const result = await service.importModFiles();
 
@@ -210,9 +224,7 @@ describe('LocalModImportService', () => {
     });
 
     it('should reject invalid file types', async () => {
-      vi.mocked(open).mockResolvedValue(['/path/to/invalid.txt']);
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockResolvedValue(new Uint8Array());
+      mockElectron({ filePaths: ['/path/to/invalid.txt'] });
 
       const result = await service.importModFiles();
 
@@ -223,9 +235,7 @@ describe('LocalModImportService', () => {
     });
 
     it('should successfully import a valid .package file', async () => {
-      vi.mocked(open).mockResolvedValue(['/path/to/mod.package']);
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockResolvedValue(new Uint8Array([1, 2, 3]));
+      mockElectron({ filePaths: ['/path/to/mod.package'] });
       vi.mocked(modCacheService.addToCache).mockResolvedValue({
         fileHash: 'abc123',
         modId: 'uuid-1',
@@ -247,9 +257,7 @@ describe('LocalModImportService', () => {
     });
 
     it('should call progress callback during import', async () => {
-      vi.mocked(open).mockResolvedValue(['/path/to/mod1.package', '/path/to/mod2.package']);
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockResolvedValue(new Uint8Array([1, 2, 3]));
+      mockElectron({ filePaths: ['/path/to/mod1.package', '/path/to/mod2.package'] });
       vi.mocked(modCacheService.addToCache).mockResolvedValue({
         fileHash: 'abc123',
         modId: 'uuid-1',
@@ -274,9 +282,7 @@ describe('LocalModImportService', () => {
     });
 
     it('should perform fake detection on ZIP files', async () => {
-      vi.mocked(open).mockResolvedValue(['/path/to/mod.zip']);
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockResolvedValue(new Uint8Array([1, 2, 3]));
+      mockElectron({ filePaths: ['/path/to/mod.zip'] });
       vi.mocked(fakeScoreService.analyzeZip).mockResolvedValue({
         has_package_files: true,
         has_ts_script: false,
@@ -308,9 +314,7 @@ describe('LocalModImportService', () => {
     });
 
     it('should handle fake detection callback for suspicious mods', async () => {
-      vi.mocked(open).mockResolvedValue(['/path/to/suspicious.zip']);
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockResolvedValue(new Uint8Array([1, 2, 3]));
+      mockElectron({ filePaths: ['/path/to/suspicious.zip'] });
       vi.mocked(fakeScoreService.analyzeZip).mockResolvedValue({
         has_package_files: false,
         has_ts_script: false,
@@ -334,9 +338,7 @@ describe('LocalModImportService', () => {
     });
 
     it('should cleanup temp directory after successful import', async () => {
-      vi.mocked(open).mockResolvedValue(['/path/to/mod.package']);
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockResolvedValue(new Uint8Array([1, 2, 3]));
+      mockElectron({ filePaths: ['/path/to/mod.package'] });
       vi.mocked(modCacheService.addToCache).mockResolvedValue({
         fileHash: 'abc123',
         modId: 'uuid-1',
@@ -349,17 +351,15 @@ describe('LocalModImportService', () => {
 
       await service.importModFiles();
 
-      expect(remove).toHaveBeenCalled();
+      expect(invoke).toHaveBeenCalledWith('fs:remove', expect.any(String), { recursive: true });
     });
 
     it('should cleanup temp directory after failed import', async () => {
-      vi.mocked(open).mockResolvedValue(['/path/to/mod.package']);
-      vi.mocked(exists).mockResolvedValue(true);
-      vi.mocked(readFile).mockRejectedValue(new Error('Read failed'));
+      mockElectron({ filePaths: ['/path/to/mod.package'], readFileError: new Error('Read failed') });
 
       await service.importModFiles();
 
-      expect(remove).toHaveBeenCalled();
+      expect(invoke).toHaveBeenCalledWith('fs:remove', expect.any(String), { recursive: true });
     });
   });
 });

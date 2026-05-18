@@ -6,9 +6,6 @@
  * Uses parallel operations with auto-detected concurrency for optimal performance.
  */
 
-import { invoke } from '@tauri-apps/api/core';
-import { join } from '@tauri-apps/api/path';
-import { readDir, remove } from '@tauri-apps/plugin-fs';
 import { SymlinkResult, SymlinkError } from '@/types/profile';
 import { sanitizeModName } from '@/utils/pathSanitizer';
 import { diskPerformanceService } from './DiskPerformanceService';
@@ -51,12 +48,9 @@ export class SymlinkService {
       cachePaths,
       async ({ source, modName }) => {
         const sanitizedName = sanitizeModName(modName);
-        const targetPath = await join(modsPath, sanitizedName);
+        const targetPath = await window.electron.ipcRenderer.invoke('path:join', modsPath, sanitizedName);
 
-        await invoke('copy_directory', {
-          source,
-          target: targetPath,
-        });
+        await window.electron.ipcRenderer.invoke('fs:copyDir', source, targetPath);
 
         return { source, modName, targetPath };
       },
@@ -76,7 +70,7 @@ export class SymlinkService {
       const sanitizedName = sanitizeModName(modName);
       errors.push({
         sourcePath: source,
-        targetPath: await join(modsPath, sanitizedName),
+        targetPath: await window.electron.ipcRenderer.invoke('path:join', modsPath, sanitizedName),
         error: String(error),
       });
     }
@@ -100,10 +94,10 @@ export class SymlinkService {
 
     try {
       // List all entries in mods directory
-      const entries = await readDir(modsPath);
+      const entries = await window.electron.ipcRenderer.invoke('fs:readDir', modsPath);
 
       // Filter to directories only
-      const directories = entries.filter((e) => e.isDirectory);
+      const directories = entries.filter((e: any) => e.isDirectory);
 
       if (directories.length === 0) {
         return { success: true, created: 0, failed: 0, errors: [] };
@@ -114,9 +108,9 @@ export class SymlinkService {
 
       const results = await concurrentMap(
         directories,
-        async (entry) => {
-          const fullPath = await join(modsPath, entry.name);
-          await remove(fullPath, { recursive: true });
+        async (entry: any) => {
+          const fullPath = await window.electron.ipcRenderer.invoke('path:join', modsPath, entry.name);
+          await window.electron.ipcRenderer.invoke('fs:remove', fullPath, { recursive: true });
           return entry.name;
         },
         poolSize
@@ -134,7 +128,7 @@ export class SymlinkService {
         const entry = directories[index];
         errors.push({
           sourcePath: '',
-          targetPath: await join(modsPath, entry.name),
+          targetPath: await window.electron.ipcRenderer.invoke('path:join', modsPath, entry.name),
           error: String(error),
         });
       }
@@ -163,8 +157,8 @@ export class SymlinkService {
     expectedCount: number
   ): Promise<boolean> {
     try {
-      const entries = await readDir(modsPath);
-      const dirCount = entries.filter((e) => e.isDirectory).length;
+      const entries = await window.electron.ipcRenderer.invoke('fs:readDir', modsPath);
+      const dirCount = entries.filter((e: any) => e.isDirectory).length;
       return dirCount === expectedCount;
     } catch (error) {
       console.error('Failed to verify mod files:', error);
@@ -177,11 +171,11 @@ export class SymlinkService {
    */
   async listSymlinks(modsPath: string): Promise<string[]> {
     try {
-      const entries = await readDir(modsPath);
+      const entries = await window.electron.ipcRenderer.invoke('fs:readDir', modsPath);
       const modDirs = await Promise.all(
         entries
-          .filter((e) => e.isDirectory)
-          .map((e) => join(modsPath, e.name))
+          .filter((e: any) => e.isDirectory)
+          .map((e: any) => window.electron.ipcRenderer.invoke('path:join', modsPath, e.name))
       );
 
       return modDirs;

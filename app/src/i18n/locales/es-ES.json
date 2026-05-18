@@ -43,7 +43,7 @@
   },
   "layout": {
     "sidebar": {
-      "logo_alt": "SimsForge",
+      "logo_alt": "CC Café",
       "active_profile": "Perfil activo",
       "browse": "Explorar",
       "library": "Biblioteca",
@@ -163,12 +163,12 @@
       "description": "Ajustes generales de la aplicación.",
       "language": {
         "title": "Idioma",
-        "description": "Elige el idioma de visualización de SimsForge."
+        "description": "Elige el idioma de visualización de CC Café."
       }
     },
     "game_location": {
       "title": "Ubicación del juego",
-      "description": "Define dónde debe buscar SimsForge tu instalación y tus mods.",
+      "description": "Define dónde debe buscar CC Café tu instalación y tus mods.",
       "game_executable": "Ejecutable de Los Sims 4",
       "mods_folder": "Carpeta de mods",
       "game_detected": "Juego detectado correctamente",
@@ -194,7 +194,7 @@
     },
     "mod_preferences": {
       "title": "Preferencias de mods",
-      "description": "Configura cómo SimsForge gestiona tus mods instalados.",
+      "description": "Configura cómo CC Café gestiona tus mods instalados.",
       "auto_updates": {
         "title": "Actualizaciones automáticas",
         "description": "Descarga e instala las actualizaciones de mods en cuanto estén disponibles."
@@ -213,7 +213,7 @@
       "description": "Opciones adicionales para resolución de problemas y diagnóstico.",
       "game_logging": {
         "title": "Registro del juego",
-        "description_1": "Habilita la vista en tiempo real de los registros de Los Sims 4. SimsForge instalará automáticamente el mod",
+        "description_1": "Habilita la vista en tiempo real de los registros de Los Sims 4. CC Café instalará automáticamente el mod",
         "link_text": "Sims Log Enabler",
         "description_2": "cuando se habilite."
       },
@@ -238,7 +238,7 @@
       "title": "Zona de peligro",
       "description": "Acciones irreversibles para restablecer o borrar datos de la aplicación.",
       "clear_cache": {
-        "title": "Borrar la caché de SimsForge",
+        "title": "Borrar la caché de CC Café",
         "description": "Puede resolver imágenes que faltan o descargas bloqueadas.",
         "button": "Borrar caché",
         "clearing": "Borrando...",

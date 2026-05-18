@@ -1,10 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Trash, Folder, Sliders, Warning, CheckCircle, FolderOpen, Terminal, HardDrive, Globe, CaretDown } from '@phosphor-icons/react';
-import { open } from '@tauri-apps/plugin-dialog';
-import { exists, readDir, remove } from '@tauri-apps/plugin-fs';
-import { join } from '@tauri-apps/api/path';
 import Layout from '@/components/layouts/Layout';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import { userPreferencesService } from '@/lib/services/UserPreferencesService';
@@ -19,6 +16,7 @@ import {
   type DiskType,
 } from '@/lib/services/DiskPerformanceService';
 import { concurrentMap } from '@/lib/utils/concurrencyPool';
+import { getCompatStorageItem, removeCompatStorageItem, setCompatStorageItem } from '@/lib/utils/storageCompat';
 import { useToast } from '@/context/ToastContext';
 import { useLanguage, type SupportedLanguage } from '@/context/LanguageContext';
 import { useTranslation } from 'react-i18next';
@@ -31,7 +29,7 @@ interface Message {
 
 // Simple encryption/decryption helper using Web Crypto API
 const StorageHelper = {
-  async encryptData(data: string, password: string = 'simsforge-settings'): Promise<string> {
+  async encryptData(data: string, password: string = 'cccafe-settings'): Promise<string> {
     try {
       const encoder = new TextEncoder();
       const data_encoded = encoder.encode(data);
@@ -68,7 +66,7 @@ const StorageHelper = {
     }
   },
 
-  async decryptData(encryptedData: string, password: string = 'simsforge-settings'): Promise<string | null> {
+  async decryptData(encryptedData: string, password: string = 'cccafe-settings'): Promise<string | null> {
     try {
       const encoder = new TextEncoder();
       const password_encoded = encoder.encode(password);
@@ -104,20 +102,20 @@ const StorageHelper = {
 
   setLocal(key: string, value: string): void {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(key, value);
+      setCompatStorageItem(key, value);
     }
   },
 
   getLocal(key: string): string | null {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem(key);
+      return getCompatStorageItem(key);
     }
     return null;
   },
 
   removeLocal(key: string): void {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem(key);
+      removeCompatStorageItem(key);
     }
   }
 };
@@ -156,45 +154,10 @@ export default function SettingsPage() {
   const { language, setLanguage, supportedLanguages, languageNames, languageFlags } = useLanguage();
   const { t } = useTranslation();
 
-  useEffect(() => {
-    loadLocalSettings();
-  }, []);
-
-  // Close language dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (languageDropdownRef.current && !languageDropdownRef.current.contains(event.target as Node)) {
-        setLanguageDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  /**
-   * Handle language change
-   */
-  function handleLanguageChange(lang: SupportedLanguage) {
-    setLanguage(lang);
-    userPreferencesService.setLanguage(lang);
-    setLanguageDropdownOpen(false);
-  }
-
-  async function checkPathExists(path: string): Promise<boolean> {
-    try {
-      const result = await exists(path);
-      return result;
-    } catch (error) {
-      console.error('Error checking path:', error);
-      return false;
-    }
-  }
-
-  async function loadLocalSettings() {
+  const loadLocalSettings = useCallback(async () => {
     try {
       // Load encrypted API key
-      const encryptedKey = StorageHelper.getLocal('simsforge_api_key');
+      const encryptedKey = StorageHelper.getLocal('cccafe_api_key');
       if (encryptedKey) {
         const decrypted = await StorageHelper.decryptData(encryptedKey);
         if (decrypted) {
@@ -204,7 +167,7 @@ export default function SettingsPage() {
       }
 
       // Load game path
-      const encryptedGamePath = StorageHelper.getLocal('simsforge_game_path');
+      const encryptedGamePath = StorageHelper.getLocal('cccafe_game_path');
       if (encryptedGamePath) {
         const decrypted = await StorageHelper.decryptData(encryptedGamePath);
         if (decrypted) {
@@ -215,7 +178,7 @@ export default function SettingsPage() {
       }
 
       // Load mods path
-      const encryptedModsPath = StorageHelper.getLocal('simsforge_mods_path');
+      const encryptedModsPath = StorageHelper.getLocal('cccafe_mods_path');
       if (encryptedModsPath) {
         const decrypted = await StorageHelper.decryptData(encryptedModsPath);
         if (decrypted) {
@@ -245,16 +208,50 @@ export default function SettingsPage() {
     } finally {
       setCheckingConfig(false);
     }
+  }, []);
+
+  useEffect(() => {
+    void loadLocalSettings();
+  }, [loadLocalSettings]);
+
+  // Close language dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (languageDropdownRef.current && !languageDropdownRef.current.contains(event.target as Node)) {
+        setLanguageDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  /**
+   * Handle language change
+   */
+  function handleLanguageChange(lang: SupportedLanguage) {
+    setLanguage(lang);
+    userPreferencesService.setLanguage(lang);
+    setLanguageDropdownOpen(false);
+  }
+
+  async function checkPathExists(path: string): Promise<boolean> {
+    try {
+      const result = await (window as any).electron.ipcRenderer.invoke('fs:exists', path);
+      return result;
+    } catch (error) {
+      console.error('Error checking path:', error);
+      return false;
+    }
   }
 
   async function handleGamePathSelect() {
-    const directory = await open({
-      multiple: false,
-      directory: false,
+    const result = await (window as any).electron.ipcRenderer.invoke('dialog:open', {
+      properties: ['openFile'],
     });
 
-    if (directory) {
-      const path = directory as string;
+    if (!result.canceled && result.filePaths.length > 0) {
+      const path = result.filePaths[0];
       setGamePath(path);
 
       // Check if path exists
@@ -264,7 +261,7 @@ export default function SettingsPage() {
       // Encrypt and save locally
       try {
         const encrypted = await StorageHelper.encryptData(path);
-        StorageHelper.setLocal('simsforge_game_path', encrypted);
+        StorageHelper.setLocal('cccafe_game_path', encrypted);
         setPathsMessage({ type: 'success', text: t('settings.game_location.game_path_updated') });
         setTimeout(() => setPathsMessage(null), 5000);
       } catch (error) {
@@ -274,13 +271,12 @@ export default function SettingsPage() {
   }
 
   async function handleModsPathSelect() {
-    const directory = await open({
-      multiple: false,
-      directory: true,
+    const result = await (window as any).electron.ipcRenderer.invoke('dialog:open', {
+      properties: ['openDirectory'],
     });
 
-    if (directory) {
-      const path = directory as string;
+    if (!result.canceled && result.filePaths.length > 0) {
+      const path = result.filePaths[0];
       setModsPath(path);
 
       // Check if path exists
@@ -290,7 +286,7 @@ export default function SettingsPage() {
       // Encrypt and save locally
       try {
         const encrypted = await StorageHelper.encryptData(path);
-        StorageHelper.setLocal('simsforge_mods_path', encrypted);
+        StorageHelper.setLocal('cccafe_mods_path', encrypted);
         setPathsMessage({ type: 'success', text: t('settings.game_location.mods_path_updated') });
         setTimeout(() => setPathsMessage(null), 5000);
       } catch (error) {
@@ -309,8 +305,8 @@ export default function SettingsPage() {
 
     try {
       // Encrypt and save locally
-      const encrypted = await StorageHelper.encryptData(curseforgeKey);
-      StorageHelper.setLocal('simsforge_api_key', encrypted);
+      const encrypted = await StorageHelper.encryptData(curseforgeKey.trim());
+      StorageHelper.setLocal('cccafe_api_key', encrypted);
 
       setApiKeyMessage({ type: 'success', text: t('settings.api_keys.saved') });
       setIsConfigured(true);
@@ -328,7 +324,7 @@ export default function SettingsPage() {
 
     try {
       // Remove from local storage
-      StorageHelper.removeLocal('simsforge_api_key');
+      StorageHelper.removeLocal('cccafe_api_key');
 
       setApiKeyMessage({ type: 'success', text: t('settings.api_keys.deleted') });
       setIsConfigured(false);
@@ -397,14 +393,14 @@ export default function SettingsPage() {
       // 1. Delete all mod files from the Mods folder (parallel)
       if (modsPath && modsPathExists) {
         try {
-          const entries = await readDir(modsPath);
-          const directories = entries.filter((e) => e.isDirectory);
+          const entries = await (window as any).electron.ipcRenderer.invoke('fs:readDir', modsPath);
+          const directories = entries.filter((e: any) => e.isDirectory);
 
           await concurrentMap(
             directories,
-            async (entry) => {
-              const fullPath = await join(modsPath, entry.name);
-              await remove(fullPath, { recursive: true });
+            async (entry: any) => {
+              const fullPath = await (window as any).electron.ipcRenderer.invoke('path:join', modsPath, entry.name);
+              await (window as any).electron.ipcRenderer.invoke('fs:remove', fullPath, { recursive: true });
             },
             poolSize
           );
@@ -1214,3 +1210,4 @@ export default function SettingsPage() {
     </Layout>
   );
 }
+

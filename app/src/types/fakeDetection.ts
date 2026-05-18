@@ -4,7 +4,7 @@
  */
 
 /**
- * ZIP analysis result from Tauri analyze_zip_content command
+ * ZIP analysis result from Electron ZIP analysis
  */
 export interface ZipAnalysis {
   /** Whether the ZIP contains any .package files */

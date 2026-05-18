@@ -61,7 +61,7 @@ export const DEFAULT_LANGUAGE: SupportedLanguage = 'en-US';
 /**
  * LocalStorage key for persisting language preference
  */
-export const LANGUAGE_STORAGE_KEY = 'simsforge_language';
+export const LANGUAGE_STORAGE_KEY = 'cccafe_language';
 
 /**
  * Translation resources bundled with the app

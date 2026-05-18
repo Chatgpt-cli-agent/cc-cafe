@@ -46,7 +46,7 @@ const getColorForLetter = (letter: string): string => {
   };
 
   const upperLetter = letter.toUpperCase();
-  return colors[upperLetter] || '#46C89B'; // Default to SimsForge green
+  return colors[upperLetter] || '#46C89B'; // Default to CC Cafe green
 };
 
 export const LocalModAvatar: React.FC<LocalModAvatarProps> = ({ modName, size = 64 }) => {

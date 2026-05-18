@@ -6,15 +6,14 @@
  * Supports multiple installation locations (Origin, Steam, EA App).
  */
 
-import { exists } from '@tauri-apps/plugin-fs';
-import { join, documentDir } from '@tauri-apps/api/path';
 import { Sims4Paths, Sims4PathValidation } from '@/types/profile';
+import { getCompatStorageItem } from '@/lib/utils/storageCompat';
 
 export class Sims4PathDetector {
   /**
    * Helper to decrypt data stored in localStorage
    */
-  private async decryptData(encryptedData: string, password: string = 'simsforge-settings'): Promise<string | null> {
+  private async decryptData(encryptedData: string, password: string = 'cccafe-settings'): Promise<string | null> {
     try {
       const encoder = new TextEncoder();
       const password_encoded = encoder.encode(password);
@@ -57,12 +56,12 @@ export class Sims4PathDetector {
 
     // Try to load from localStorage (user-configured paths from Settings)
     if (typeof window !== 'undefined') {
-      const encryptedGamePath = localStorage.getItem('simsforge_game_path');
+      const encryptedGamePath = getCompatStorageItem('cccafe_game_path');
       if (encryptedGamePath) {
         gamePath = await this.decryptData(encryptedGamePath);
       }
 
-      const encryptedModsPath = localStorage.getItem('simsforge_mods_path');
+      const encryptedModsPath = getCompatStorageItem('cccafe_mods_path');
       if (encryptedModsPath) {
         modsPath = await this.decryptData(encryptedModsPath);
       }
@@ -103,16 +102,80 @@ export class Sims4PathDetector {
     ];
 
     for (const path of commonPaths) {
-      if (await exists(path)) {
+      if (await window.electron.ipcRenderer.invoke('fs:exists', path)) {
         return path;
       }
     }
 
-    // TODO: Add Windows Registry lookup for EA App and Origin
-    // HKEY_LOCAL_MACHINE\SOFTWARE\Electronic Arts\EA Games\The Sims 4
-    // or check EA App installation paths
+    const registryGamePath = await this.detectGamePathFromRegistry();
+    if (registryGamePath) {
+      return registryGamePath;
+    }
 
     return null;
+  }
+
+  /**
+   * Detect game path using common Windows registry keys
+   */
+  private async detectGamePathFromRegistry(): Promise<string | null> {
+    const registryKeys = [
+      'HKLM:\\SOFTWARE\\EA Games\\The Sims 4',
+      'HKLM:\\SOFTWARE\\WOW6432Node\\EA Games\\The Sims 4',
+      'HKLM:\\SOFTWARE\\Maxis\\The Sims 4',
+      'HKLM:\\SOFTWARE\\WOW6432Node\\Maxis\\The Sims 4',
+      'HKCU:\\SOFTWARE\\EA Games\\The Sims 4',
+      'HKCU:\\SOFTWARE\\WOW6432Node\\EA Games\\The Sims 4',
+    ];
+
+    const registryValues = ['Install Dir', 'InstallDir', 'InstallLocation', 'ExePath', 'Path'];
+
+    for (const key of registryKeys) {
+      for (const valueName of registryValues) {
+        const value = await this.readRegistryValue(key, valueName);
+        if (!value) {
+          continue;
+        }
+
+        const normalized = value.replace(/\\/g, '/');
+        const candidate = normalized.toLowerCase().endsWith('.exe')
+          ? value
+          : await window.electron.ipcRenderer.invoke(
+              'path:join',
+              value,
+              'Game',
+              'Bin',
+              'TS4_x64.exe'
+            );
+
+        if (await window.electron.ipcRenderer.invoke('fs:exists', candidate)) {
+          return candidate;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Read a registry value using PowerShell.
+   */
+  private async readRegistryValue(keyPath: string, valueName: string): Promise<string | null> {
+    try {
+      const command = [
+        'powershell',
+        '-NoProfile',
+        '-Command',
+        `try { Get-ItemProperty -Path '${keyPath.replace(/'/g, "''")}' | Select-Object -ExpandProperty '${valueName.replace(/'/g, "''")}' } catch { '' }`,
+      ];
+
+      const result = await window.electron.ipcRenderer.invoke('shell:execute', command[0], command.slice(1));
+      const output = (result?.stdout || '').toString().trim();
+      return output || null;
+    } catch (error) {
+      console.warn('[Sims4PathDetector] Registry lookup failed:', keyPath, valueName, error);
+      return null;
+    }
   }
 
   /**
@@ -121,26 +184,28 @@ export class Sims4PathDetector {
   private async detectModsPath(): Promise<string | null> {
     try {
       // Get user's Documents folder
-      const documentsDir = await documentDir();
-      const modsPath = await join(
+      const documentsDir = await window.electron.ipcRenderer.invoke('path:documentDir');
+      const modsPath = await window.electron.ipcRenderer.invoke(
+        'path:join',
         documentsDir,
         'Electronic Arts',
         'The Sims 4',
         'Mods'
       );
 
-      if (await exists(modsPath)) {
+      if (await window.electron.ipcRenderer.invoke('fs:exists', modsPath)) {
         return modsPath;
       }
 
       // Try alternative: just "Mods" folder
-      const altModsPath = await join(
+      const altModsPath = await window.electron.ipcRenderer.invoke(
+        'path:join',
         documentsDir,
         'The Sims 4',
         'Mods'
       );
 
-      if (await exists(altModsPath)) {
+      if (await window.electron.ipcRenderer.invoke('fs:exists', altModsPath)) {
         return altModsPath;
       }
     } catch (error) {
@@ -155,10 +220,10 @@ export class Sims4PathDetector {
    */
   async validatePaths(paths: Sims4Paths): Promise<Sims4PathValidation> {
     const gameValid = paths.gamePath
-      ? await exists(paths.gamePath)
+      ? await window.electron.ipcRenderer.invoke('fs:exists', paths.gamePath)
       : false;
     const modsValid = paths.modsPath
-      ? await exists(paths.modsPath)
+      ? await window.electron.ipcRenderer.invoke('fs:exists', paths.modsPath)
       : false;
 
     return { gameValid, modsValid };

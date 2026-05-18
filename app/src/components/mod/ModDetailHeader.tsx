@@ -7,6 +7,7 @@ import { ShareNetwork, Heart, DownloadSimple, Spinner, Check, Warning } from '@p
 import { useToast } from '@/context/ToastContext';
 import { useProfiles } from '@/context/ProfileContext';
 import { modInstallationService } from '@/lib/services/ModInstallationService';
+import { getCompatStorageItem } from '@/lib/utils/storageCompat';
 import { useDateFormatters } from '@/hooks/useDateFormatters';
 import { useTranslation } from 'react-i18next';
 import { useCategoryLocalization } from '@/utils/categoryTranslation';
@@ -47,13 +48,7 @@ export default function ModDetailHeader({ mod, warningStatus }: ModDetailHeaderP
 
       // Get modsPath from localStorage
       const StorageHelper = {
-        getLocal: (key: string): string | null => {
-          if (typeof window !== 'undefined') {
-            return localStorage.getItem(key);
-          }
-          return null;
-        },
-        decryptData: async (encryptedData: string, password: string = 'simsforge-settings'): Promise<string | null> => {
+        decryptData: async (encryptedData: string, password: string = 'cccafe-settings'): Promise<string | null> => {
           try {
             const encoder = new TextEncoder();
             const password_encoded = encoder.encode(password);
@@ -80,7 +75,7 @@ export default function ModDetailHeader({ mod, warningStatus }: ModDetailHeaderP
         }
       };
 
-      const encryptedModsPath = StorageHelper.getLocal('simsforge_mods_path');
+      const encryptedModsPath = getCompatStorageItem('cccafe_mods_path');
       if (!encryptedModsPath) {
         showToast({
           type: 'error',
@@ -307,3 +302,4 @@ export default function ModDetailHeader({ mod, warningStatus }: ModDetailHeaderP
     </div>
   );
 }
+

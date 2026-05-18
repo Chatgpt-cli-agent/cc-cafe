@@ -6,14 +6,8 @@
  * Persists update state to JSON file for cross-session tracking.
  */
 
-import {
-  writeFile,
-  readFile,
-  exists,
-  mkdir,
-} from '@tauri-apps/plugin-fs';
-import { appDataDir, join } from '@tauri-apps/api/path';
 import { checkModVersions } from '@/lib/curseforgeApi';
+import { resolveAppDataPath } from './AppPaths';
 import type { ProfileMod } from '@/types/profile';
 import type {
   UpdateState,
@@ -22,10 +16,10 @@ import type {
 } from '@/types/updates';
 
 /**
- * Check if running inside Tauri desktop app
+ * Check if running inside Electron desktop app
  */
-function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+function isElectron(): boolean {
+  return typeof window !== 'undefined' && !!window.electron;
 }
 
 /**
@@ -52,30 +46,25 @@ export class UpdateCheckService {
       return;
     }
 
-    // Skip initialization if not running in Tauri
-    if (!isTauri()) {
-      console.warn('[UpdateCheckService] Not running in Tauri, skipping file persistence');
+    // Skip initialization if not running in Electron
+    if (!isElectron()) {
+      console.warn('[UpdateCheckService] Not running in Electron, skipping file persistence');
       this.initialized = true;
       return;
     }
 
     try {
-      const appData = await appDataDir();
-      const simsForgeDir = await join(appData, 'SimsForge');
-      this.updateStatePath = await join(simsForgeDir, 'updates.json');
-
-      if (!(await exists(simsForgeDir))) {
-        await mkdir(simsForgeDir, { recursive: true });
-      }
+      const simsCafeDir = await resolveAppDataPath();
+      this.updateStatePath = await window.electron.ipcRenderer.invoke('path:join', simsCafeDir, 'updates.json');
 
       // Mark as initialized BEFORE saving to avoid recursion
       this.initialized = true;
 
       // Initialize state file if not exists
-      if (!(await exists(this.updateStatePath))) {
-        await writeFile(
-          this.updateStatePath,
-          new TextEncoder().encode(JSON.stringify(DEFAULT_UPDATE_STATE, null, 2))
+      if (!(await window.electron.ipcRenderer.invoke('fs:exists', this.updateStatePath))) {
+        await window.electron.ipcRenderer.invoke('fs:writeFile', 
+          this.updateStatePath, 
+          JSON.stringify(DEFAULT_UPDATE_STATE, null, 2)
         );
       }
     } catch (error) {
@@ -117,8 +106,8 @@ export class UpdateCheckService {
     try {
       // Extract mod IDs to check
       const modIds = profileMods
-        .filter((mod) => mod.modId > 0)
-        .map((mod) => mod.modId);
+        .filter((mod) => typeof mod.modId === 'number' && mod.modId > 0)
+        .map((mod) => mod.modId as number);
 
       if (modIds.length === 0) {
         return result;
@@ -132,6 +121,7 @@ export class UpdateCheckService {
       const updates: UpdateInfo[] = [];
 
       for (const mod of profileMods) {
+        if (typeof mod.modId !== 'number') continue;
         const latest = latestVersions[mod.modId];
 
         if (!latest) {
@@ -143,8 +133,8 @@ export class UpdateCheckService {
           const updateInfo: UpdateInfo = {
             modId: mod.modId,
             modName: mod.modName,
-            currentVersionId: mod.versionId,
-            currentVersionName: mod.versionNumber,
+            currentVersionId: mod.versionId as number,
+            currentVersionName: mod.versionNumber as string,
             latestVersionId: latest.latestFileId,
             latestVersionName: latest.latestDisplayName,
             latestFileName: latest.latestFileName,
@@ -194,19 +184,18 @@ export class UpdateCheckService {
   async getUpdateState(): Promise<UpdateState> {
     await this.ensureInitialized();
 
-    // Return default state if not in Tauri (no file persistence)
-    if (!isTauri() || !this.updateStatePath) {
+    // Return default state if not in Electron (no file persistence)
+    if (!isElectron() || !this.updateStatePath) {
       return { ...DEFAULT_UPDATE_STATE };
     }
 
     try {
-      if (!(await exists(this.updateStatePath))) {
+      if (!(await window.electron.ipcRenderer.invoke('fs:exists', this.updateStatePath))) {
         return { ...DEFAULT_UPDATE_STATE };
       }
 
-      const content = await readFile(this.updateStatePath);
-      const decoder = new TextDecoder();
-      const state = JSON.parse(decoder.decode(content)) as UpdateState;
+      const content = await window.electron.ipcRenderer.invoke('fs:readTextFile', this.updateStatePath);
+      const state = JSON.parse(content) as UpdateState;
 
       // Validate structure
       if (!state.availableUpdates) {
@@ -226,15 +215,15 @@ export class UpdateCheckService {
   async saveUpdateState(state: UpdateState): Promise<void> {
     await this.ensureInitialized();
 
-    // Skip saving if not in Tauri (no file persistence)
-    if (!isTauri() || !this.updateStatePath) {
+    // Skip saving if not in Electron (no file persistence)
+    if (!isElectron() || !this.updateStatePath) {
       return;
     }
 
     try {
-      await writeFile(
-        this.updateStatePath,
-        new TextEncoder().encode(JSON.stringify(state, null, 2))
+      await window.electron.ipcRenderer.invoke('fs:writeFile', 
+        this.updateStatePath, 
+        JSON.stringify(state, null, 2)
       );
     } catch (error) {
       console.error('[UpdateCheckService] Failed to save update state:', error);

@@ -5,15 +5,8 @@
  * of mod files in the Backups directory within AppData.
  */
 
-import {
-  exists,
-  mkdir,
-  readDir,
-  remove,
-} from '@tauri-apps/plugin-fs';
-import { appDataDir, join } from '@tauri-apps/api/path';
-import { invoke } from '@tauri-apps/api/core';
 import { modCacheService } from './ModCacheService';
+import { resolveAppDataPath } from './AppPaths';
 import type { ProfileMod } from '@/types/profile';
 
 /**
@@ -55,11 +48,10 @@ export class BackupService {
     }
 
     try {
-      const appData = await appDataDir();
-      this.backupDir = await join(appData, 'SimsForge', 'Backups');
+      this.backupDir = await resolveAppDataPath('Backups');
 
-      if (!(await exists(this.backupDir))) {
-        await mkdir(this.backupDir, { recursive: true });
+      if (!(await (window as any).electron.ipcRenderer.invoke('fs:exists', this.backupDir))) {
+        await (window as any).electron.ipcRenderer.invoke('fs:mkdir', this.backupDir, { recursive: true });
       }
 
       this.initialized = true;
@@ -92,7 +84,7 @@ export class BackupService {
       await modCacheService.initialize();
       const cachePath = await modCacheService.getCachePath(mod.fileHash);
 
-      if (!(await exists(cachePath))) {
+      if (!(await (window as any).electron.ipcRenderer.invoke('fs:exists', cachePath))) {
         return {
           success: false,
           error: `Cache not found for mod: ${mod.modName}`,
@@ -102,18 +94,18 @@ export class BackupService {
       // Create backup directory for this mod
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const backupName = `${this.sanitizeName(mod.modName)}_v${mod.versionNumber}_${timestamp}`;
-      const modBackupDir = await join(this.backupDir!, backupName);
+      const modBackupDir = await (window as any).electron.ipcRenderer.invoke('path:join', this.backupDir!, backupName);
 
-      await mkdir(modBackupDir, { recursive: true });
+      await (window as any).electron.ipcRenderer.invoke('fs:mkdir', modBackupDir, { recursive: true });
 
-      // Copy files from cache to backup
-      await invoke('copy_directory', {
-        source: cachePath,
-        target: modBackupDir,
-      });
+      // Copy files from cache to backup using PowerShell as we don't have a direct copy handler
+      await (window as any).electron.ipcRenderer.invoke('shell:execute', 'powershell', [
+        '-Command',
+        `Copy-Item -Path '${cachePath.replace(/'/g, "''")}' -Destination '${modBackupDir.replace(/'/g, "''")}' -Recurse -Force`
+      ]);
 
       // Clean up old backups for this mod (keep only MAX_BACKUPS_PER_MOD)
-      await this.cleanupOldBackups(mod.modId, mod.modName);
+      await this.cleanupOldBackups(mod.modName);
 
       console.log(`[BackupService] Created backup: ${modBackupDir}`);
 
@@ -137,7 +129,7 @@ export class BackupService {
     await this.ensureInitialized();
 
     try {
-      const entries = await readDir(this.backupDir!);
+      const entries = await (window as any).electron.ipcRenderer.invoke('fs:readDir', this.backupDir!);
       const sanitizedName = this.sanitizeName(modName);
       const backups: BackupEntry[] = [];
 
@@ -146,7 +138,7 @@ export class BackupService {
           // Parse backup name to extract info
           const parts = entry.name.split('_v');
           if (parts.length >= 2) {
-            const backupPath = await join(this.backupDir!, entry.name);
+            const backupPath = await (window as any).electron.ipcRenderer.invoke('path:join', this.backupDir!, entry.name);
             backups.push({
               modId: 0, // Would need to store metadata to get this
               modName: modName,
@@ -177,12 +169,12 @@ export class BackupService {
     await this.ensureInitialized();
 
     try {
-      const entries = await readDir(this.backupDir!);
+      const entries = await (window as any).electron.ipcRenderer.invoke('fs:readDir', this.backupDir!);
       const backups: BackupEntry[] = [];
 
       for (const entry of entries) {
         if (entry.isDirectory) {
-          const backupPath = await join(this.backupDir!, entry.name);
+          const backupPath = await (window as any).electron.ipcRenderer.invoke('path:join', this.backupDir!, entry.name);
           const parts = entry.name.split('_v');
 
           backups.push({
@@ -212,8 +204,8 @@ export class BackupService {
    */
   async deleteBackup(backupPath: string): Promise<boolean> {
     try {
-      if (await exists(backupPath)) {
-        await remove(backupPath, { recursive: true });
+      if (await (window as any).electron.ipcRenderer.invoke('fs:exists', backupPath)) {
+        await (window as any).electron.ipcRenderer.invoke('fs:remove', backupPath, { recursive: true });
         return true;
       }
       return false;
@@ -233,13 +225,13 @@ export class BackupService {
     let errors = 0;
 
     try {
-      const entries = await readDir(this.backupDir!);
+      const entries = await (window as any).electron.ipcRenderer.invoke('fs:readDir', this.backupDir!);
 
       for (const entry of entries) {
         if (entry.isDirectory) {
           try {
-            const fullPath = await join(this.backupDir!, entry.name);
-            await remove(fullPath, { recursive: true });
+            const fullPath = await (window as any).electron.ipcRenderer.invoke('path:join', this.backupDir!, entry.name);
+            await (window as any).electron.ipcRenderer.invoke('fs:remove', fullPath, { recursive: true });
             deleted++;
           } catch (error) {
             errors++;
@@ -257,7 +249,7 @@ export class BackupService {
   /**
    * Cleanup old backups for a mod, keeping only the most recent ones
    */
-  private async cleanupOldBackups(modId: number, modName: string): Promise<void> {
+  private async cleanupOldBackups(modName: string): Promise<void> {
     try {
       const backups = await this.getBackupsForMod(modName);
 

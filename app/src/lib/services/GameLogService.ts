@@ -5,9 +5,6 @@
  * Used with the Sims Log Enabler mod to display game logs.
  */
 
-import { readDir, readTextFile, exists } from '@tauri-apps/plugin-fs';
-import { join } from '@tauri-apps/api/path';
-
 /**
  * Name of the Log Enabler mod folder
  */
@@ -73,8 +70,8 @@ export class GameLogService {
   private async getLogsPath(): Promise<string | null> {
     if (!this.modsPath) return null;
 
-    const logsPath = await join(this.modsPath, LOG_ENABLER_FOLDER, LOGS_SUBFOLDER);
-    const logsExist = await exists(logsPath);
+    const logsPath = await window.electron.ipcRenderer.invoke('path:join', this.modsPath, LOG_ENABLER_FOLDER, LOGS_SUBFOLDER);
+    const logsExist = await window.electron.ipcRenderer.invoke('fs:exists', logsPath);
 
     return logsExist ? logsPath : null;
   }
@@ -125,12 +122,10 @@ export class GameLogService {
    */
   private async readNewContent(filePath: string, filename: string): Promise<LogEntry[]> {
     try {
-      const content = await readTextFile(filePath);
-      const lines = content.split('\n');
+      const content = await window.electron.ipcRenderer.invoke('fs:readTextFile', filePath);
       const entries: LogEntry[] = [];
 
       const watched = this.watchedFiles.get(filename);
-      const startLine = watched ? Math.floor(watched.lastSize / 100) : 0; // Approximate line count
 
       // For simplicity, we'll track by content length
       const currentSize = content.length;
@@ -145,7 +140,7 @@ export class GameLogService {
         ? content.slice(watched.lastSize)
         : content;
 
-      const newLines = newContent.split('\n').filter(l => l.trim());
+      const newLines = newContent.split('\n').filter((l: string) => l.trim());
 
       for (const line of newLines) {
         const entry = this.parseLogLine(line, filename.replace('.log', ''));
@@ -176,13 +171,13 @@ export class GameLogService {
     if (!logsPath) return;
 
     try {
-      const entries = await readDir(logsPath);
+      const entries = await window.electron.ipcRenderer.invoke('fs:readDir', logsPath);
       const allNewEntries: LogEntry[] = [];
 
       for (const entry of entries) {
         if (!entry.name.endsWith('.log')) continue;
 
-        const filePath = await join(logsPath, entry.name);
+        const filePath = await window.electron.ipcRenderer.invoke('path:join', logsPath, entry.name);
         const newEntries = await this.readNewContent(filePath, entry.name);
         allNewEntries.push(...newEntries);
       }
@@ -272,10 +267,10 @@ export class GameLogService {
     if (!logsPath) return [];
 
     try {
-      const entries = await readDir(logsPath);
+      const entries = await window.electron.ipcRenderer.invoke('fs:readDir', logsPath);
       return entries
-        .filter(e => e.name.endsWith('.log'))
-        .map(e => e.name);
+        .filter((e: any) => e.name.endsWith('.log'))
+        .map((e: any) => e.name);
     } catch {
       return [];
     }
@@ -289,8 +284,8 @@ export class GameLogService {
     if (!logsPath) return [];
 
     try {
-      const filePath = await join(logsPath, filename);
-      const content = await readTextFile(filePath);
+      const filePath = await window.electron.ipcRenderer.invoke('path:join', logsPath, filename);
+      const content = await window.electron.ipcRenderer.invoke('fs:readTextFile', filePath);
       const lines = content.split('\n');
       const entries: LogEntry[] = [];
 
@@ -331,13 +326,12 @@ export class GameLogService {
     if (!logsPath) return false;
 
     try {
-      const { remove } = await import('@tauri-apps/plugin-fs');
-      const entries = await readDir(logsPath);
+      const entries = await window.electron.ipcRenderer.invoke('fs:readDir', logsPath);
 
       for (const entry of entries) {
         if (entry.name.endsWith('.log')) {
-          const filePath = await join(logsPath, entry.name);
-          await remove(filePath);
+          const filePath = await window.electron.ipcRenderer.invoke('path:join', logsPath, entry.name);
+          await window.electron.ipcRenderer.invoke('fs:remove', filePath);
         }
       }
 

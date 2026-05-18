@@ -1,0 +1,35 @@
+export const BRANDING = {
+  appName: 'CC Café',
+  sidebar: {
+    home: 'Counter',
+    browse: 'Menu',
+    pantry: 'Pantry',
+    profiles: 'Profiles',
+    settings: 'Settings',
+  },
+  curseforge: {
+    home: 'Counter',
+    browse: 'Menu',
+    creatorMenu: 'Creator Menu',
+    orders: 'Orders',
+    freshBatch: 'Fresh Batch',
+    favoritesMenu: 'Favorites Menu',
+    baristas: 'Baristas',
+    recentUpdates: 'Recent CC Updates',
+    favoriteAction: 'Favorite',
+    favoritedAction: 'Favorited',
+    orderAll: 'Order all',
+    checkFreshBatch: 'Fresh Batch',
+  },
+  library: {
+    title: 'Pantry',
+    updateAll: 'Fresh Batch',
+    checkUpdates: 'Fresh Batch',
+    installedMods: 'Installed Mods',
+  },
+  downloads: {
+    brewing: 'Brewing',
+    downloadingContent: 'Downloading Content...',
+    queue: 'Brewing',
+  },
+} as const;

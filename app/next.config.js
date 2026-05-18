@@ -1,15 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Tauri expects a static export
+  // Next.js config for static export
   output: 'export',
+  trailingSlash: false,
   devIndicators: false,
 
-  // Optimize images for Tauri
+  // Static export uses unoptimized remote images in Electron.
   images: {
     unoptimized: true,
   },
 
-  // Disable static optimizations for Tauri
   staticPageGenerationTimeout: 1000,
 };
 

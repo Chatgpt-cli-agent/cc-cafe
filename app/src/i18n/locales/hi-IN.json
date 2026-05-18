@@ -43,7 +43,7 @@
   },
   "layout": {
     "sidebar": {
-      "logo_alt": "SimsForge",
+      "logo_alt": "CC Café",
       "active_profile": "सक्रिय प्रोफ़ाइल",
       "browse": "देखें",
       "library": "लाइब्रेरी",
@@ -163,12 +163,12 @@
       "description": "सामान्य एप्लिकेशन सेटिंग्स।",
       "language": {
         "title": "भाषा",
-        "description": "SimsForge की प्रदर्शन भाषा चुनें।"
+        "description": "CC Café की प्रदर्शन भाषा चुनें।"
       }
     },
     "game_location": {
       "title": "गेम स्थान",
-      "description": "SimsForge को अपनी इंस्टॉलेशन और मॉड्स कहाँ ढूँढना चाहिए यह परिभाषित करें।",
+      "description": "CC Café को अपनी इंस्टॉलेशन और मॉड्स कहाँ ढूँढना चाहिए यह परिभाषित करें।",
       "game_executable": "The Sims 4 एक्जीक्यूटेबल",
       "mods_folder": "मॉड्स फ़ोल्डर",
       "game_detected": "गेम सफलतापूर्वक पता चला",
@@ -194,7 +194,7 @@
     },
     "mod_preferences": {
       "title": "मॉड प्राथमिकताएँ",
-      "description": "SimsForge आपके इंस्टॉल किए गए मॉड्स को कैसे प्रबंधित करता है कॉन्फ़िगर करें।",
+      "description": "CC Café आपके इंस्टॉल किए गए मॉड्स को कैसे प्रबंधित करता है कॉन्फ़िगर करें।",
       "auto_updates": {
         "title": "स्वचालित अपडेट",
         "description": "जैसे ही उपलब्ध हों मॉड अपडेट डाउनलोड और इंस्टॉल करें।"
@@ -213,7 +213,7 @@
       "description": "समस्या निवारण और निदान के लिए अतिरिक्त विकल्प।",
       "game_logging": {
         "title": "गेम लॉगिंग",
-        "description_1": "The Sims 4 से वास्तविक समय लॉग देखने को सक्षम करें। SimsForge स्वचालित रूप से",
+        "description_1": "The Sims 4 से वास्तविक समय लॉग देखने को सक्षम करें। CC Café स्वचालित रूप से",
         "link_text": "Sims Log Enabler",
         "description_2": "मॉड इंस्टॉल करेगा जब सक्षम किया जाएगा।"
       },
@@ -238,7 +238,7 @@
       "title": "खतरे का क्षेत्र",
       "description": "एप्लिकेशन डेटा को रीसेट या साफ़ करने के लिए अपरिवर्तनीय क्रियाएँ।",
       "clear_cache": {
-        "title": "SimsForge कैश साफ़ करें",
+        "title": "CC Café कैश साफ़ करें",
         "description": "गायब इमेज या ब्लॉक डाउनलोड को हल कर सकता है।",
         "button": "कैश साफ़ करें",
         "clearing": "साफ़ कर रहे हैं...",

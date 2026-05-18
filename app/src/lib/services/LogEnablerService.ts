@@ -5,9 +5,6 @@
  * This mod enables real-time log viewing from The Sims 4.
  */
 
-import { fetch } from '@tauri-apps/plugin-http';
-import { writeFile, exists, remove, mkdir } from '@tauri-apps/plugin-fs';
-import { join } from '@tauri-apps/api/path';
 import { apiGet } from '@/lib/apiClient';
 
 /**
@@ -81,11 +78,11 @@ export class LogEnablerService {
   async isInstalled(modsPath: string): Promise<boolean> {
     try {
       const metadata = await this.getMetadata();
-      const installDir = await join(modsPath, LOG_ENABLER_FOLDER);
+      const installDir = await window.electron.ipcRenderer.invoke('path:join', modsPath, LOG_ENABLER_FOLDER);
 
       for (const file of metadata.files) {
-        const filePath = await join(installDir, file.filename);
-        const fileExists = await exists(filePath);
+        const filePath = await window.electron.ipcRenderer.invoke('path:join', installDir, file.filename);
+        const fileExists = await window.electron.ipcRenderer.invoke('fs:exists', filePath);
         if (!fileExists) {
           return false;
         }
@@ -107,7 +104,7 @@ export class LogEnablerService {
   async install(modsPath: string): Promise<{ success: boolean; error?: string }> {
     try {
       // Validate mods path exists
-      const modsExists = await exists(modsPath);
+      const modsExists = await window.electron.ipcRenderer.invoke('fs:exists', modsPath);
       if (!modsExists) {
         return {
           success: false,
@@ -119,34 +116,29 @@ export class LogEnablerService {
       const metadata = await this.getMetadata();
 
       // Create the subfolder for the Log Enabler
-      const installDir = await join(modsPath, LOG_ENABLER_FOLDER);
-      const installDirExists = await exists(installDir);
+      const installDir = await window.electron.ipcRenderer.invoke('path:join', modsPath, LOG_ENABLER_FOLDER);
+      const installDirExists = await window.electron.ipcRenderer.invoke('fs:exists', installDir);
       if (!installDirExists) {
-        await mkdir(installDir, { recursive: true });
+        await window.electron.ipcRenderer.invoke('fs:mkdir', installDir, { recursive: true });
       }
 
-      // Download and install each file
+      // Install each packaged tool file
       for (const file of metadata.files) {
-        const downloadUrl = `${BACKEND_URL}/api/v1/tools/${TOOL_ID}/download/${encodeURIComponent(file.filename)}`;
-
-        const response = await fetch(downloadUrl, {
-          method: 'GET',
-          connectTimeout: 30000,
+        const fileBytes = await window.electron.ipcRenderer.invoke('tools:get-file', {
+          toolId: TOOL_ID,
+          filename: file.filename,
         });
 
-        if (!response.ok) {
+        if (fileBytes && typeof fileBytes === 'object' && 'success' in fileBytes && !fileBytes.success) {
           return {
             success: false,
-            error: `Failed to download ${file.filename}: ${response.status} ${response.statusText}`,
+            error: fileBytes.error || `Failed to load ${file.filename}`,
           };
         }
 
-        // Get file bytes
-        const fileBytes = await response.bytes();
-
         // Write to the subfolder
-        const destPath = await join(installDir, file.filename);
-        await writeFile(destPath, fileBytes);
+        const destPath = await window.electron.ipcRenderer.invoke('path:join', installDir, file.filename);
+        await window.electron.ipcRenderer.invoke('fs:writeFile', destPath, fileBytes);
 
         console.log(`[LogEnablerService] Installed ${file.filename} to ${destPath}`);
       }
@@ -170,17 +162,17 @@ export class LogEnablerService {
    */
   async uninstall(modsPath: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const installDir = await join(modsPath, LOG_ENABLER_FOLDER);
+      const installDir = await window.electron.ipcRenderer.invoke('path:join', modsPath, LOG_ENABLER_FOLDER);
 
       // Check if the folder exists
-      const folderExists = await exists(installDir);
+      const folderExists = await window.electron.ipcRenderer.invoke('fs:exists', installDir);
       if (!folderExists) {
         // Nothing to uninstall
         return { success: true };
       }
 
       // Remove the entire folder
-      await remove(installDir, { recursive: true });
+      await window.electron.ipcRenderer.invoke('fs:remove', installDir, { recursive: true });
       console.log(`[LogEnablerService] Removed folder ${installDir}`);
 
       return { success: true };

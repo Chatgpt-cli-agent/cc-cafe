@@ -15,6 +15,7 @@ import { useToast } from '@/context/ToastContext';
 import { useProfiles } from '@/context/ProfileContext';
 import { modInstallationService } from '@/lib/services/ModInstallationService';
 import { userPreferencesService } from '@/lib/services/UserPreferencesService';
+import { getCompatStorageItem } from '@/lib/utils/storageCompat';
 import { formatDownloadCount } from '@/utils/formatters';
 import { useDateFormatters } from '@/hooks/useDateFormatters';
 import { fakeScoreService } from '@/lib/services/FakeScoreService';
@@ -68,13 +69,7 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
 
       // Get modsPath from localStorage
       const StorageHelper = {
-        getLocal: (key: string): string | null => {
-          if (typeof window !== 'undefined') {
-            return localStorage.getItem(key);
-          }
-          return null;
-        },
-        decryptData: async (encryptedData: string, password: string = 'simsforge-settings'): Promise<string | null> => {
+        decryptData: async (encryptedData: string, password: string = 'cccafe-settings'): Promise<string | null> => {
           try {
             const encoder = new TextEncoder();
             const password_encoded = encoder.encode(password);
@@ -101,7 +96,7 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
         }
       };
 
-      const encryptedModsPath = StorageHelper.getLocal('simsforge_mods_path');
+      const encryptedModsPath = getCompatStorageItem('cccafe_mods_path');
       if (!encryptedModsPath) {
         showToast({
           type: 'error',
@@ -307,7 +302,28 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
                 {mod.name}
               </h3>
               <p className="text-xs line-clamp-1" style={{ color: 'var(--text-secondary)' }}>
-                {t('mods.card.by')} {authorNames || t('mods.card.unknown_author')}
+                {t('mods.card.by')}{' '}
+                {mod.authors.length > 0 ? (
+                  mod.authors.map((author, index) => (
+                    <span key={author.id}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          window.history.pushState(null, '', `/?tab=creators&creatorId=${author.id}&creatorName=${encodeURIComponent(author.name)}`);
+                          window.dispatchEvent(new PopStateEvent('popstate'));
+                        }}
+                        className="underline hover:text-brand-green cursor-pointer"
+                      >
+                        {author.name}
+                      </button>
+                      {index < mod.authors.length - 1 ? ', ' : ''}
+                    </span>
+                  ))
+                ) : (
+                  t('mods.card.unknown_author')
+                )}
               </p>
             </div>
 
@@ -388,3 +404,4 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
     </>
   );
 }
+

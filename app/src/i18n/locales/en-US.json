@@ -43,7 +43,7 @@
   },
   "layout": {
     "sidebar": {
-      "logo_alt": "SimsForge",
+      "logo_alt": "CC Café",
       "active_profile": "Active Profile",
       "browse": "Browse",
       "library": "Library",
@@ -163,12 +163,12 @@
       "description": "General application settings.",
       "language": {
         "title": "Language",
-        "description": "Choose the display language for SimsForge."
+        "description": "Choose the display language for CC Café."
       }
     },
     "game_location": {
       "title": "Game Location",
-      "description": "Define where SimsForge should look for your installation and mods.",
+      "description": "Define where CC Café should look for your installation and mods.",
       "game_executable": "The Sims 4 Executable",
       "mods_folder": "Mods Folder",
       "game_detected": "Game detected successfully",
@@ -194,7 +194,7 @@
     },
     "mod_preferences": {
       "title": "Mod Preferences",
-      "description": "Configure how SimsForge manages your installed mods.",
+      "description": "Configure how CC Café manages your installed mods.",
       "auto_updates": {
         "title": "Auto-updates",
         "description": "Download and install mod updates as soon as they're available."
@@ -213,7 +213,7 @@
       "description": "Additional options for troubleshooting and diagnostics.",
       "game_logging": {
         "title": "Game logging",
-        "description_1": "Enable real-time log viewing from The Sims 4. SimsForge will automatically install the",
+        "description_1": "Enable real-time log viewing from The Sims 4. CC Café will automatically install the",
         "link_text": "Sims Log Enabler",
         "description_2": "mod when enabled."
       },
@@ -238,7 +238,7 @@
       "title": "Danger Zone",
       "description": "Irreversible actions to reset or clear application data.",
       "clear_cache": {
-        "title": "Clear SimsForge cache",
+        "title": "Clear CC Café cache",
         "description": "Can resolve missing images or blocked downloads.",
         "button": "Clear cache",
         "clearing": "Clearing...",

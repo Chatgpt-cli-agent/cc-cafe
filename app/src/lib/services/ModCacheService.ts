@@ -6,23 +6,13 @@
  */
 
 import {
-  writeFile,
-  readFile,
-  exists,
-  mkdir,
-  readDir,
-  remove,
-} from '@tauri-apps/plugin-fs';
-import { appDataDir } from '@tauri-apps/api/path';
-import { join, basename } from '@tauri-apps/api/path';
-import { invoke } from '@tauri-apps/api/core';
-import {
   CachedMod,
   CachedModFile,
   ModCacheIndex,
 } from '@/types/profile';
 import { diskPerformanceService } from './DiskPerformanceService';
 import { concurrentMap } from '@/lib/utils/concurrencyPool';
+import { resolveAppDataPath } from './AppPaths';
 
 export class ModCacheService {
   private cacheDir: string | null = null;
@@ -38,16 +28,15 @@ export class ModCacheService {
       return;
     }
 
-    const appData = await appDataDir();
-    this.cacheDir = await join(appData, 'SimsForge', 'ModsCache');
-    this.indexFile = await join(this.cacheDir, 'cache.index.json');
+    this.cacheDir = await resolveAppDataPath('ModsCache');
+    this.indexFile = await window.electron.ipcRenderer.invoke('path:join', this.cacheDir!, 'cache.index.json');
 
-    if (!(await exists(this.cacheDir))) {
-      await mkdir(this.cacheDir, { recursive: true });
+    if (!(await window.electron.ipcRenderer.invoke('fs:exists', this.cacheDir))) {
+      await window.electron.ipcRenderer.invoke('fs:mkdir', this.cacheDir, { recursive: true });
     }
 
     // Initialize index if not exists
-    if (!(await exists(this.indexFile))) {
+    if (!(await window.electron.ipcRenderer.invoke('fs:exists', this.indexFile))) {
       const defaultIndex: ModCacheIndex = {
         version: this.CACHE_VERSION,
         entries: {},
@@ -89,9 +78,9 @@ export class ModCacheService {
     }
 
     // Create new cache entry
-    const cacheEntryDir = await join(this.cacheDir!, fileHash);
-    const cacheFilesDir = await join(cacheEntryDir, 'files');
-    await mkdir(cacheFilesDir, { recursive: true });
+    const cacheEntryDir = await window.electron.ipcRenderer.invoke('path:join', this.cacheDir!, fileHash);
+    const cacheFilesDir = await window.electron.ipcRenderer.invoke('path:join', cacheEntryDir, 'files');
+    await window.electron.ipcRenderer.invoke('fs:mkdir', cacheFilesDir, { recursive: true });
 
     // Extract mod to cache directory
     const extractedFiles = await this.extractModToCache(
@@ -114,10 +103,11 @@ export class ModCacheService {
     };
 
     // Save metadata
-    const metadataPath = await join(cacheEntryDir, 'metadata.json');
-    await writeFile(
+    const metadataPath = await window.electron.ipcRenderer.invoke('path:join', cacheEntryDir, 'metadata.json');
+    await window.electron.ipcRenderer.invoke(
+      'fs:writeFile',
       metadataPath,
-      new TextEncoder().encode(JSON.stringify(cachedMod, null, 2))
+      JSON.stringify(cachedMod, null, 2)
     );
 
     // Update index
@@ -142,7 +132,7 @@ export class ModCacheService {
    */
   async getCachePath(fileHash: string): Promise<string> {
     await this.ensureInitialized();
-    return await join(this.cacheDir!, fileHash, 'files');
+    return await window.electron.ipcRenderer.invoke('path:join', this.cacheDir!, fileHash, 'files');
   }
 
   /**
@@ -270,9 +260,8 @@ export class ModCacheService {
 
   private async getIndex(): Promise<ModCacheIndex> {
     try {
-      const content = await readFile(this.indexFile!);
-      const decoder = new TextDecoder();
-      return JSON.parse(decoder.decode(content));
+      const content = await window.electron.ipcRenderer.invoke('fs:readTextFile', this.indexFile!);
+      return JSON.parse(content);
     } catch (error) {
       console.error('Failed to read cache index:', error);
       // Return empty index if corrupted
@@ -285,26 +274,23 @@ export class ModCacheService {
   }
 
   private async saveIndex(index: ModCacheIndex): Promise<void> {
-    await writeFile(
+    await window.electron.ipcRenderer.invoke(
+      'fs:writeFile',
       this.indexFile!,
-      new TextEncoder().encode(JSON.stringify(index, null, 2))
+      JSON.stringify(index, null, 2)
     );
   }
 
   private async calculateFileHash(filePath: string): Promise<string> {
-    // Use Tauri command to calculate SHA-256 hash
-    const hash = await invoke<string>('calculate_file_hash', {
-      filePath,
-    });
+    // Use Electron IPC to calculate SHA-256 hash
+    const hash = await window.electron.ipcRenderer.invoke('crypto:hashFile', filePath);
     return hash;
   }
 
   private async getFileSize(filePath: string): Promise<number> {
-    // Use Tauri command to get file size
-    const size = await invoke<number>('get_file_size', {
-      filePath,
-    });
-    return size;
+    // Use Electron IPC to get file size
+    const stats = await window.electron.ipcRenderer.invoke('fs:stat', filePath);
+    return stats.size;
   }
 
   private async extractModToCache(
@@ -313,7 +299,7 @@ export class ModCacheService {
   ): Promise<CachedModFile[]> {
     // Extract ZIP to cache directory
     try {
-      await invoke('extract_zip', {
+      await window.electron.ipcRenderer.invoke('extract-zip', {
         zipPath: sourcePath,
         destDir,
       });
@@ -344,10 +330,10 @@ export class ModCacheService {
     const results: string[] = [];
 
     try {
-      const entries = await readDir(dir);
+      const entries = await window.electron.ipcRenderer.invoke('fs:readDir', dir);
 
       for (const entry of entries) {
-        const fullPath = await join(dir, entry.name);
+        const fullPath = await window.electron.ipcRenderer.invoke('path:join', dir, entry.name);
 
         if (entry.isDirectory) {
           const subResults = await this.findPackageFiles(fullPath);
@@ -364,10 +350,10 @@ export class ModCacheService {
   }
 
   private async deleteCacheEntry(fileHash: string): Promise<void> {
-    const cacheEntryDir = await join(this.cacheDir!, fileHash);
-    if (await exists(cacheEntryDir)) {
+    const cacheEntryDir = await window.electron.ipcRenderer.invoke('path:join', this.cacheDir!, fileHash);
+    if (await window.electron.ipcRenderer.invoke('fs:exists', cacheEntryDir)) {
       try {
-        await remove(cacheEntryDir, { recursive: true });
+        await window.electron.ipcRenderer.invoke('fs:remove', cacheEntryDir, { recursive: true });
       } catch (error) {
         console.error(`Failed to delete cache entry ${fileHash}:`, error);
       }

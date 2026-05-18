@@ -2,18 +2,9 @@
  * Disk Performance Service
  *
  * Benchmarks disk speed at first launch to auto-detect optimal concurrency.
- * Uses Rust-side benchmark for accurate measurements without IPC overhead.
+ * Uses Electron-side benchmark for accurate measurements without IPC overhead.
  * Stores configuration in AppData for persistence across sessions.
  */
-
-import { invoke } from '@tauri-apps/api/core';
-import {
-  writeFile,
-  readFile,
-  exists,
-  mkdir,
-} from '@tauri-apps/plugin-fs';
-import { appDataDir, join } from '@tauri-apps/api/path';
 
 /**
  * Disk performance configuration stored in AppData
@@ -41,17 +32,19 @@ const BENCHMARK_VERSION = 2;
 const DEFAULT_POOL_SIZE = 5;
 
 /**
- * Result from Rust benchmark command
+ * Result from Electron benchmark command
  */
-interface RustBenchmarkResult {
-  speed_mbps: number;
-  bytes_written: number;
-  elapsed_ms: number;
+interface BenchmarkResult {
+  writeSpeed: number;
+  readSpeed: number;
+  driveType: string;
 }
 
 /**
  * Service for auto-detecting optimal disk concurrency
  */
+import { resolveAppDataPath } from './AppPaths';
+
 export class DiskPerformanceService {
   private configPath: string | null = null;
   private config: DiskPerformanceConfig | null = null;
@@ -67,17 +60,11 @@ export class DiskPerformanceService {
     }
 
     try {
-      const appData = await appDataDir();
-      const simsForgeDir = await join(appData, 'SimsForge');
-      this.configPath = await join(simsForgeDir, 'performance.json');
-
-      // Ensure SimsForge directory exists
-      if (!(await exists(simsForgeDir))) {
-        await mkdir(simsForgeDir, { recursive: true });
-      }
+      const simsCafeDir = await resolveAppDataPath();
+      this.configPath = await window.electron.ipcRenderer.invoke('path:join', simsCafeDir, 'performance.json');
 
       // Load existing config if available
-      if (await exists(this.configPath)) {
+      if (await window.electron.ipcRenderer.invoke('fs:exists', this.configPath)) {
         await this.loadConfig();
       }
 
@@ -142,7 +129,7 @@ export class DiskPerformanceService {
   }
 
   /**
-   * Run the disk benchmark using Rust for accurate measurements.
+   * Run the disk benchmark using Electron for accurate measurements.
    *
    * @param onProgress - Optional progress callback (0-100)
    * @returns The new configuration
@@ -152,10 +139,10 @@ export class DiskPerformanceService {
   ): Promise<DiskPerformanceConfig> {
     await this.ensureInitialized();
 
-    console.log('[DiskPerformanceService] Starting Rust benchmark...');
+    console.log('[DiskPerformanceService] Starting Electron benchmark...');
 
     try {
-      // Animate progress smoothly while Rust benchmark runs
+      // Animate progress smoothly while Electron benchmark runs
       let currentProgress = 0;
       const progressInterval = setInterval(() => {
         if (currentProgress < 85) {
@@ -164,16 +151,17 @@ export class DiskPerformanceService {
         }
       }, 100);
 
-      // Call Rust benchmark command for accurate measurement
-      const result = await invoke<RustBenchmarkResult>('benchmark_disk_speed');
+      // Call Electron benchmark command for accurate measurement
+      const testPath = await window.electron.ipcRenderer.invoke('path:appDataDir');
+      const result = await window.electron.ipcRenderer.invoke('disk:benchmark', { testPath });
 
       clearInterval(progressInterval);
       onProgress?.(90);
 
-      const diskSpeedMBps = result.speed_mbps;
+      const diskSpeedMBps = result.writeSpeed;
 
       console.log(
-        `[DiskPerformanceService] Benchmark complete: ${diskSpeedMBps} MB/s (${result.bytes_written / (1024 * 1024)} MB in ${result.elapsed_ms} ms)`
+        `[DiskPerformanceService] Benchmark complete: ${diskSpeedMBps} MB/s (Read: ${result.readSpeed} MB/s, Type: ${result.driveType})`
       );
 
       // Calculate optimal pool size
@@ -248,9 +236,8 @@ export class DiskPerformanceService {
    */
   private async loadConfig(): Promise<void> {
     try {
-      const content = await readFile(this.configPath!);
-      const decoder = new TextDecoder();
-      this.config = JSON.parse(decoder.decode(content));
+      const content = await window.electron.ipcRenderer.invoke('fs:readTextFile', this.configPath!);
+      this.config = JSON.parse(content);
 
       // Validate config version
       if (this.config && this.config.benchmarkVersion !== BENCHMARK_VERSION) {
@@ -269,9 +256,10 @@ export class DiskPerformanceService {
    * Save configuration to disk.
    */
   private async saveConfig(config: DiskPerformanceConfig): Promise<void> {
-    await writeFile(
+    await window.electron.ipcRenderer.invoke(
+      'fs:writeFile',
       this.configPath!,
-      new TextEncoder().encode(JSON.stringify(config, null, 2))
+      JSON.stringify(config, null, 2)
     );
   }
 

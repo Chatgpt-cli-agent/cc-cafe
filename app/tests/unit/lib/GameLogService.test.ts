@@ -5,25 +5,41 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock Tauri APIs
-vi.mock('@tauri-apps/plugin-fs', () => ({
-  readDir: vi.fn(),
-  readTextFile: vi.fn(),
-  exists: vi.fn(),
-  remove: vi.fn(),
-}));
+const invoke = vi.mocked(window.electron.ipcRenderer.invoke);
 
-vi.mock('@tauri-apps/api/path', () => ({
-  join: vi.fn((...parts: string[]) => Promise.resolve(parts.join('/'))),
-}));
-
-import { readDir, readTextFile, exists, remove } from '@tauri-apps/plugin-fs';
+function mockInvoke({
+  exists = true,
+  entries = [],
+  content = '',
+}: {
+  exists?: boolean;
+  entries?: Array<{ name: string }>;
+  content?: string;
+} = {}) {
+  invoke.mockImplementation(async (channel: string, ...args: any[]) => {
+    switch (channel) {
+      case 'path:join':
+        return args.join('/');
+      case 'fs:exists':
+        return exists;
+      case 'fs:readDir':
+        return entries;
+      case 'fs:readTextFile':
+        return content;
+      case 'fs:remove':
+        return true;
+      default:
+        return undefined;
+    }
+  });
+}
 
 describe('GameLogService', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
     vi.useFakeTimers();
+    mockInvoke();
   });
 
   afterEach(() => {
@@ -141,7 +157,7 @@ describe('GameLogService', () => {
 
   describe('startWatching', () => {
     it('should return false when logs folder not found', async () => {
-      (exists as any).mockResolvedValue(false);
+      mockInvoke({ exists: false });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'
@@ -155,8 +171,7 @@ describe('GameLogService', () => {
     });
 
     it('should start watching when logs folder exists', async () => {
-      (exists as any).mockResolvedValue(true);
-      (readDir as any).mockResolvedValue([]);
+      mockInvoke({ exists: true, entries: [] });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'
@@ -173,8 +188,7 @@ describe('GameLogService', () => {
     });
 
     it('should stop previous watcher before starting new one', async () => {
-      (exists as any).mockResolvedValue(true);
-      (readDir as any).mockResolvedValue([]);
+      mockInvoke({ exists: true, entries: [] });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'
@@ -192,8 +206,7 @@ describe('GameLogService', () => {
     });
 
     it('should pass includeDebugLogs option', async () => {
-      (exists as any).mockResolvedValue(true);
-      (readDir as any).mockResolvedValue([]);
+      mockInvoke({ exists: true, entries: [] });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'
@@ -211,8 +224,7 @@ describe('GameLogService', () => {
 
   describe('stopWatching', () => {
     it('should stop watching and clear state', async () => {
-      (exists as any).mockResolvedValue(true);
-      (readDir as any).mockResolvedValue([]);
+      mockInvoke({ exists: true, entries: [] });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'
@@ -229,12 +241,14 @@ describe('GameLogService', () => {
 
   describe('getLogFiles', () => {
     it('should return list of .log files', async () => {
-      (exists as any).mockResolvedValue(true);
-      (readDir as any).mockResolvedValue([
+      mockInvoke({
+        exists: true,
+        entries: [
         { name: 'game.log' },
         { name: 'script.log' },
         { name: 'readme.txt' },
-      ]);
+        ],
+      });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'
@@ -259,8 +273,12 @@ describe('GameLogService', () => {
     });
 
     it('should return empty array on error', async () => {
-      (exists as any).mockResolvedValue(true);
-      (readDir as any).mockRejectedValue(new Error('Read error'));
+      invoke.mockImplementation(async (channel: string, ...args: any[]) => {
+        if (channel === 'path:join') return args.join('/');
+        if (channel === 'fs:exists') return true;
+        if (channel === 'fs:readDir') throw new Error('Read error');
+        return undefined;
+      });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'
@@ -276,10 +294,10 @@ describe('GameLogService', () => {
 
   describe('readLogFile', () => {
     it('should parse all lines from log file', async () => {
-      (exists as any).mockResolvedValue(true);
-      (readTextFile as any).mockResolvedValue(
-        '10:00:00.000000 [INFO] Line 1\n10:00:01.000000 [WARN] Line 2\n'
-      );
+      mockInvoke({
+        exists: true,
+        content: '10:00:00.000000 [INFO] Line 1\n10:00:01.000000 [WARN] Line 2\n',
+      });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'
@@ -295,7 +313,7 @@ describe('GameLogService', () => {
     });
 
     it('should return empty array when logs path not found', async () => {
-      (exists as any).mockResolvedValue(false);
+      mockInvoke({ exists: false });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'
@@ -311,12 +329,13 @@ describe('GameLogService', () => {
 
   describe('clearLogs', () => {
     it('should delete all .log files', async () => {
-      (exists as any).mockResolvedValue(true);
-      (readDir as any).mockResolvedValue([
+      mockInvoke({
+        exists: true,
+        entries: [
         { name: 'game.log' },
         { name: 'script.log' },
-      ]);
-      (remove as any).mockResolvedValue(undefined);
+        ],
+      });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'
@@ -327,11 +346,12 @@ describe('GameLogService', () => {
       const result = await service.clearLogs();
 
       expect(result).toBe(true);
-      expect(remove).toHaveBeenCalledTimes(2);
+      expect(invoke).toHaveBeenCalledWith('fs:remove', '/mods/Sims_Log_Enabler/Logs/Fallback/game.log');
+      expect(invoke).toHaveBeenCalledWith('fs:remove', '/mods/Sims_Log_Enabler/Logs/Fallback/script.log');
     });
 
     it('should return false when logs path not found', async () => {
-      (exists as any).mockResolvedValue(false);
+      mockInvoke({ exists: false });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'
@@ -345,8 +365,7 @@ describe('GameLogService', () => {
     });
 
     it('should use modsPathOverride when provided', async () => {
-      (exists as any).mockResolvedValue(true);
-      (readDir as any).mockResolvedValue([]);
+      mockInvoke({ exists: true, entries: [] });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'
@@ -356,12 +375,19 @@ describe('GameLogService', () => {
       await service.clearLogs('/override/mods');
 
       // Should have attempted to check the override path
-      expect(exists).toHaveBeenCalled();
+      expect(invoke).toHaveBeenCalledWith(
+        'fs:exists',
+        '/override/mods/Sims_Log_Enabler/Logs/Fallback'
+      );
     });
 
     it('should return false on error', async () => {
-      (exists as any).mockResolvedValue(true);
-      (readDir as any).mockRejectedValue(new Error('Read error'));
+      invoke.mockImplementation(async (channel: string, ...args: any[]) => {
+        if (channel === 'path:join') return args.join('/');
+        if (channel === 'fs:exists') return true;
+        if (channel === 'fs:readDir') throw new Error('Read error');
+        return undefined;
+      });
 
       const { GameLogService } = await import(
         '@/lib/services/GameLogService'

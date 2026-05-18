@@ -6,6 +6,7 @@
  */
 
 import type { SupportedLanguage } from '@/context/LanguageContext';
+import { getCompatStorageItem, setCompatStorageItem } from '@/lib/utils/storageCompat';
 
 /**
  * User preferences structure
@@ -31,7 +32,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   language: null,
 };
 
-const STORAGE_KEY = 'simsforge_user_preferences';
+const STORAGE_KEY = 'cccafe_user_preferences';
 
 /**
  * Service for managing user preferences
@@ -49,7 +50,7 @@ export class UserPreferencesService {
     }
 
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = getCompatStorageItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Partial<UserPreferences>;
         this.preferences = {
@@ -72,7 +73,7 @@ export class UserPreferencesService {
     if (!this.initialized) {
       // Synchronous fallback - try to load from localStorage
       try {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const stored = getCompatStorageItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored) as Partial<UserPreferences>;
           this.preferences = {
@@ -223,7 +224,7 @@ export class UserPreferencesService {
    */
   private savePreferences(): void {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.preferences));
+      setCompatStorageItem(STORAGE_KEY, JSON.stringify(this.preferences));
     } catch (error) {
       console.error('[UserPreferencesService] Failed to save preferences:', error);
     }
