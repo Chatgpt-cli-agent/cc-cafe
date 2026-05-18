@@ -32,30 +32,48 @@ cd app
 npm install
 ```
 
-## Development
+## Build Guide
+
+From the `app/` folder:
 
 ```bash
-cd app
+npm install
+npx prisma generate
+npx prisma db push
+```
+
+Run the app in development:
+
+```bash
 npm run dev
 ```
 
-## Build
+Create a production build:
 
 ```bash
-cd app
 npm run build
 ```
 
-## Tests
+Run checks locally:
 
 ```bash
-cd app
 npm test
 npm run lint
 ```
 
+Package the desktop app:
+
+```bash
+npm run release
+```
+
+## Development Notes
+
+- The app runtime is Electron-based.
+- The repo is set up for branch-protected `main` with GitHub Actions verification.
+- Keep changes on feature branches and merge through pull requests.
+
 ## Notes
 
-- The runtime is Electron-based.
 - The top-level `updates/` folder is kept for release artifacts and manifest output.
 
