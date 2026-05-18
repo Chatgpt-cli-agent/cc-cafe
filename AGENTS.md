@@ -7,7 +7,7 @@ CC Café is a monolithic Electron + Next.js desktop app for The Sims 4. The acti
 ```
 CC Café/
 └── app/                      # Electron main process + Next.js frontend
-    ├── main/                 # Electron main process, IPC, services, core DBPF logic
+    ├── electron/             # Electron main process, IPC, services, core DBPF logic
     ├── prisma/               # SQLite schema and generated client
     └── src/                  # Frontend app, components, hooks, services
 ```

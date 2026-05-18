@@ -5,7 +5,7 @@
   "main": "dist-main/main.js",
   "scripts": {
     "dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "build": "next build && tsc -p tsconfig.main.json && powershell -Command \"Copy-Item main/core/*.js dist-main/core/ -Force\"",
+    "build": "next build && tsc -p tsconfig.main.json && powershell -Command \"Copy-Item electron/core/*.js dist-main/core/ -Force\"",
     "start": "powershell -Command \"$env:NODE_ENV='production'; electron .\"",
     "lint": "eslint .",
     "test": "vitest run",
