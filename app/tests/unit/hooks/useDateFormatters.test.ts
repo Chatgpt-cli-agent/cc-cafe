@@ -50,7 +50,7 @@ vi.mock('@/i18n', () => ({
     'zh-CN': 'CN',
   },
   DEFAULT_LANGUAGE: 'en-US',
-  LANGUAGE_STORAGE_KEY: 'simsforge_language',
+  LANGUAGE_STORAGE_KEY: 'cccafe_language',
   normalizeLanguage: (lang: string) => lang as any,
 }));
 

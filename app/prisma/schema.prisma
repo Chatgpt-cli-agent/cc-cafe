@@ -1,4 +1,4 @@
-// SimsForge Database Schema
+// CC Café Database Schema
 // Prisma ORM configuration for PostgreSQL
 
 generator client {
