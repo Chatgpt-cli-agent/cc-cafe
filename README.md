@@ -70,6 +70,7 @@ npm run release
 ## Development Notes
 
 - The app runtime is Electron-based.
+- Electron main-process code lives in `app/electron/`.
 - The repo is set up for branch-protected `main` with GitHub Actions verification.
 - Keep changes on feature branches and merge through pull requests.
 
