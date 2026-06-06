@@ -3,7 +3,10 @@
  * Handles the complete lifecycle of fake mod detection and moderation
  */
 
-import { PrismaClient } from '@prisma/client';
+import { app } from 'electron';
+import { createRequire } from 'module';
+import path from 'path';
+import type { PrismaClient as PrismaClientInstance } from '@prisma/client';
 import type {
   ReportSubmission,
   ModWarningStatus,
@@ -13,7 +16,36 @@ import type {
 } from '../../types/fakeDetection.types';
 import { logger } from '../../utils/logger';
 
+type PrismaClientConstructor = new () => PrismaClientInstance;
+
+const requireFromHere = createRequire(__filename);
+
+function loadPrismaClient(): PrismaClientConstructor {
+  const clientModulePath = app.isPackaged
+    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', '.prisma', 'client')
+    : '@prisma/client';
+
+  const clientModule = requireFromHere(clientModulePath) as {
+    PrismaClient: PrismaClientConstructor;
+  };
+
+  return clientModule.PrismaClient;
+}
+
+const PrismaClient = loadPrismaClient();
 const prisma = new PrismaClient();
+
+type WarnedModRow = {
+  modId: number;
+  creatorId: number | null;
+  reportCount: number;
+  isAutoWarned: boolean;
+  warningReason: string | null;
+};
+
+type BannedCreatorRow = {
+  creatorId: number;
+};
 
 /**
  * Configuration constants for the reporting system
@@ -257,7 +289,7 @@ export class ReportService {
     try {
       const warnings = await prisma.warnedMod.findMany({
         where: { modId: { in: modIds } },
-      });
+      }) as WarnedModRow[];
 
       // Collect all creator IDs to check for bans
       const allCreatorIds = new Set<number>();
@@ -279,7 +311,7 @@ export class ReportService {
       // Batch fetch banned creators
       const bannedCreators = await prisma.bannedCreator.findMany({
         where: { creatorId: { in: Array.from(allCreatorIds) } },
-      });
+      }) as BannedCreatorRow[];
 
       const bannedCreatorSet = new Set(bannedCreators.map((b) => b.creatorId));
 

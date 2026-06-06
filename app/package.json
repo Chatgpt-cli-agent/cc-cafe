@@ -1,17 +1,76 @@
 {
   "name": "cc-cafe-app",
   "version": "0.5.0",
+  "description": "A Sims 4 custom content manager.",
+  "author": "CC Cafe",
   "private": true,
   "main": "dist-main/main.js",
   "scripts": {
     "dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "build": "next build && tsc -p tsconfig.main.json && powershell -Command \"Copy-Item electron/core/*.js dist-main/core/ -Force\"",
+    "build": "prisma generate && next build && tsc -p tsconfig.main.json && powershell -Command \"Copy-Item electron/core/*.js dist-main/core/ -Force\"",
     "start": "powershell -Command \"$env:NODE_ENV='production'; electron .\"",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "release": "npm run build && electron-builder"
+    "release": "npm run build && electron-builder",
+    "release:win": "npm run build && electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "app.cc-cafe.desktop",
+    "productName": "CC Cafe",
+    "copyright": "Copyright © 2026 CC Cafe",
+    "directories": {
+      "output": "dist-build"
+    },
+    "artifactName": "${productName} Setup ${version}.${ext}",
+    "asar": true,
+    "asarUnpack": [
+      "assets/tools/**/*.exe",
+      "**/node_modules/.prisma/**",
+      "**/node_modules/@prisma/client/**",
+      "**/node_modules/dotenv/**"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/.prisma",
+        "to": "app.asar.unpacked/node_modules/.prisma"
+      },
+      {
+        "from": "node_modules/dotenv",
+        "to": "app.asar.unpacked/node_modules/dotenv"
+      }
+    ],
+    "files": [
+      "dist/**",
+      "dist-main/**/*",
+      "out/**/*",
+      "assets/**/*",
+      "public/**/*",
+      "prisma/**/*",
+      "node_modules/.prisma/**",
+      "node_modules/@prisma/client/**",
+      "node_modules/dotenv/**",
+      "package.json"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CC Cafe"
+    }
   },
   "dependencies": {
     "@nodebug/pngjs-image": "^1.0.0",
@@ -23,6 +82,7 @@
     "country-flag-icons": "^1.6.16",
     "curseforge-api": "^1.3.0",
     "date-fns": "^4.1.0",
+    "dotenv": "^17.4.2",
     "i18next": "^25.10.10",
     "i18next-browser-languagedetector": "^8.2.1",
     "jimp": "^1.6.1",
