@@ -25,6 +25,11 @@ dist-ssr
 /.vscode/
 /.next/
 dist-main/
+release/
+*.db
+*.db-journal
+.env
+.env.*
 
 # Claude Code temporary files
 tmpclaude-*-cwd

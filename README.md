@@ -67,6 +67,18 @@ Package the desktop app:
 npm run release
 ```
 
+### Linux packaging
+
+The build scripts are cross-platform. On Linux, `electron-builder` is configured in `app/electron-builder.yml` to produce an AppImage and a `.deb` package:
+
+```bash
+cd app
+npm run build
+npx electron-builder --linux
+```
+
+Built artifacts are written to `app/release/`.
+
 ## Development Notes
 
 - The app runtime is Electron-based.

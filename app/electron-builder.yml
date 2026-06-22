@@ -1,0 +1,35 @@
+appId: com.cccafe.app
+productName: CC Café
+copyright: Copyright © 2026 CC Café
+directories:
+  output: release
+  buildResources: buildResources
+files:
+  - filter:
+      - dist-main/**
+      - out/**
+      - package.json
+extraResources:
+  - from: prisma
+    to: prisma
+    filter:
+      - "**/*"
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  category: Game
+  maintainer: CC Café
+  synopsis: Sims 4 mod manager
+  description: Browse, install, and manage Sims 4 custom content and mods.
+  icon: public/icon.png
+  desktop:
+    entry: |
+      Name=CC Café
+      Comment=Sims 4 mod manager
+      Categories=Game;Utility;
+      StartupWMClass=CC Café
