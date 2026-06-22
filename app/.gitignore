@@ -28,8 +28,11 @@ dist-main/
 release/
 *.db
 *.db-journal
+!prisma/dev.db
 .env
 .env.*
+
+electron/generated/
 
 # Claude Code temporary files
 tmpclaude-*-cwd

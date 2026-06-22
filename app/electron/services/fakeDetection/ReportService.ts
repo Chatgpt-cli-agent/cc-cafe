@@ -3,7 +3,7 @@
  * Handles the complete lifecycle of fake mod detection and moderation
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../generated/prisma';
 import type {
   ReportSubmission,
   ModWarningStatus,

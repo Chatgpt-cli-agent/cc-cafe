@@ -8,7 +8,9 @@ files:
   - filter:
       - dist-main/**
       - out/**
+      - node_modules/**
       - package.json
+asar: false
 extraResources:
   - from: prisma
     to: prisma
