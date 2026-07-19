@@ -1,0 +1,6 @@
+provider: generic
+url: https://api.gametimedev.de/S4MM/update-testing/win
+channel: alpha
+updaterCacheDirName: sims4modmanager-updater
+publisherName:
+  - Fabian Stamm

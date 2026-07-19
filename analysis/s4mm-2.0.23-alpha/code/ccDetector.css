@@ -1,0 +1,146 @@
+.mainBox {
+    background-color: #252525bf;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.topBar {
+    display: flex;
+    justify-content: space-between;
+    background-color: #151515;
+    padding: 8px 15px;
+}
+
+.topBar h3 {
+    margin: 0;
+    margin-top: auto;
+    margin-bottom: auto;
+    font-size: 15px;
+    font-weight: bold;
+    color: #737373;
+}
+
+.topBar div {
+    display: flex;
+    gap: 5px;
+    margin-right: -5px;
+}
+
+.topBar div button {
+    width: 20px;
+    height: 20px;
+    border-radius: 100%;
+    background-color: #85858553;
+    border: none;
+    transition-duration: 200ms;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0.6;
+}
+
+.topBar div button img {
+    width: 15px;
+    height: 15px;
+    margin: auto;
+    opacity: 0.9;
+}
+
+.topBar div button:hover {
+    opacity: 1;
+}
+
+.topBar div button:active {
+    scale: 0.95;
+}
+
+.hiddeOnHover {
+    opacity: 1;
+    transition-duration: 300ms;
+}
+
+.hiddeOnHover:hover {
+    opacity: 0;
+}
+
+.blob2 {
+    width: 200px;
+    height: 130px;
+    padding: 20px;
+    box-sizing: border-box;
+    background: #21212100;
+    mix-blend-mode: unset;
+    display: grid;
+    /*filter: contrast(10);*/
+    opacity: 0.6;
+}
+
+.blob2:before,
+.blob2:after {
+    content: "";
+    grid-area: 1/1;
+    animation: l2 10s infinite linear;
+    background: #986f67;
+    border-radius: 50%;
+}
+
+.blob2:after {
+    animation-delay: -.8s;
+}
+
+@keyframes l2 {
+    12.5% {
+        border-radius: 37% 63% 70% 30% / 30% 62% 38% 70%
+    }
+    25% {
+        border-radius: 84% 16% 15% 85% / 55% 79% 21% 45%
+    }
+    37.5% {
+        border-radius: 73% 27% 74% 26% / 64% 32% 68% 36%
+    }
+    50% {
+        border-radius: 73% 27% 18% 82% / 52% 32% 68% 48%
+    }
+    62.5% {
+        border-radius: 33% 67% 18% 82% / 52% 75% 25% 48%
+    }
+    75% {
+        border-radius: 12% 88% 69% 31% / 10% 66% 34% 90%
+    }
+    87.5% {
+        border-radius: 50% 50% 70% 30% / 52% 62% 38% 48%
+    }
+}
+
+.item {
+    background-color: #15151550;
+    border: #737373 1px solid;
+    max-width: 100px;
+    width: 100px;
+    max-height: 140px;
+    border-radius: 10px;
+    overflow: hidden;
+    display: none;
+}
+
+.item img {
+    max-width: 100px;
+    width: 100px;
+    object-fit: cover;
+}
+
+.warning {
+    background-color: rgb(140, 59, 59);
+    padding: 5px 10px;
+    max-width: 160px;
+    border-radius: 10px;
+    color: white;
+    font-size: 0.8;
+}
+
+.simpleText {
+    margin: 0;
+    text-align: center;
+    margin-bottom: 10px;
+    font-size: 0.6em;
+}

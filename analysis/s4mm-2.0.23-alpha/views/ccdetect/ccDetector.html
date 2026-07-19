@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>CC Detector Overlay</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="./ccDetector.css">
+</head>
+<style>
+    body {
+        padding: 0px;
+        margin: 0px;
+        color: rgb(202, 202, 202);
+        font-family: Verdana, sans-serif;
+        overflow: hidden;
+        -webkit-user-select: none;
+        /* Safari */
+        -moz-user-select: none;
+        /* Firefox */
+        -ms-user-select: none;
+        /* IE10+/Edge */
+        user-select: none;
+        /* Standard */
+        background-color: transparent;
+    }
+</style>
+
+<body>
+
+
+    <!--Main item-->
+    <div style="width: 300px; height: 236px; display: flex; flex-direction: column;" class="mainBox">
+        <!--Top-->
+        <div class="topBar" style="-webkit-app-region: drag;">
+            <h3>SIMS 4 MOD MANAGER</h3>
+            <div>
+                <button><img src="./drag_pan.svg"></button>
+                <button style="-webkit-app-region: no-drag;" id="bt_close"><img src="./close.svg"></button>
+            </div>
+        </div>
+
+        <!--Content-->
+        <div style="flex-grow: 1; position: relative;">
+
+            <!--BG-->
+            <div style="position: absolute; inset: 0; display: flex; justify-content: center; align-items: center;">
+                <div class="blob2" style="position: absolute; left: 50%; top: 50%; transform: translateX(-50%) translateY(-50%);"></div>
+                <!--<p class="itemWaring" *ngIf="sds.currentItem && sds.currentItem.state==0">CC detection failed on the screenshot. Please try again and ensure the item has a green frame around it.</p>-->
+            </div>
+
+            <!--Items-->
+            <div style="position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; display: flex; gap: 30px;">
+
+                <!--Item-->
+                <div class="item" id="item-1">
+                    <img id="item-1-img">
+                </div>
+
+                <div class="item" id="item-2">
+                    <img id="item-2-img">
+                </div>
+
+                <div class="item" id="item-3">
+                    <img src="./indeterminate_question_box.svg" style="filter: brightness(0.65); width: 50px; margin: auto; padding-top: 25px; padding-bottom: 25px;">
+                </div>
+
+            </div>
+            <!--Msg-->
+            <div style="position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; text-align: center;">
+                <p id="warning" style="display: none;" class="warning">No CC was recognized on the screenshot.</p>
+            </div>
+
+
+        </div>
+
+        <p class="simpleText" id="bottom-message">Waiting for screenshot...</p>
+
+        <p class="smallInfo">Shortcut keys can be customized in the tools settings.</p>
+    </div>
+
+
+
+
+    <script src="./ccDetector.js"></script>
+</body>
+
+</html>

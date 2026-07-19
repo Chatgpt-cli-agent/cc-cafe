@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Loading Data...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<style>
+    body {
+        padding: 0px;
+        margin: 0px;
+        color: rgb(202, 202, 202);
+        font-family: Verdana, sans-serif;
+        overflow: hidden;
+        -webkit-user-select: none;
+        /* Safari */
+        -moz-user-select: none;
+        /* Firefox */
+        -ms-user-select: none;
+        /* IE10+/Edge */
+        user-select: none;
+        /* Standard */
+    }
+    
+    .holder {
+        width: 480px;
+        height: 180px;
+        background-color: #191919;
+        border-radius: 25px;
+        padding: 12px;
+        border: solid 1px #5d5d5d;
+    }
+    
+    img {
+        width: 150px;
+        height: 150px;
+        margin-right: 12px;
+        /*filter: grayscale();*/
+    }
+    
+    progress {
+        border-radius: 10px;
+        height: 20px;
+        width: 100%;
+        margin-top: 10px;
+    }
+    
+    progress::-webkit-progress-bar {
+        background-color: #404040;
+        border-radius: 10px;
+    }
+    
+    progress::-webkit-progress-value {
+        background-color: #76f066;
+        border-radius: 10px;
+    }
+    
+    .topSplit {
+        display: flex;
+        flex-direction: row;
+    }
+    
+    .insideSlit {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    
+    .title h2 {
+        margin: 0px;
+        margin-top: 20px;
+        color: white;
+    }
+    
+    .title p {
+        margin: 0px;
+    }
+    
+    .statsHolder p {
+        margin: 0px;
+        font-size: 0.8em;
+    }
+    
+    .infoText {
+        margin: 0px;
+        font-size: 0.7em;
+    }
+    
+    .infoButton {
+        background-color: #76f066;
+        border: none;
+        padding: 5px 15px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.85em;
+        margin: 0;
+        transition-duration: 250ms;
+        width: 140px;
+    }
+    
+    .infoButton:hover {
+        opacity: 0.8;
+    }
+    
+    .infoButton:active {
+        transform: scale(0.95);
+    }
+    
+    .infoButtonAlt {
+        background-color: rgba(255, 255, 255, 0.087) !important;
+        color: white;
+    }
+    
+    .infoButton:hover {
+        opacity: 0.8;
+    }
+    
+    .infoButton:active {
+        transform: scale(0.95);
+    }
+    
+    .infoBox {
+        height: auto;
+        display: none;
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        width: calc(507px - 50px);
+        gap: 10px;
+        filter: drop-shadow(0px 10px 10px black);
+    }
+    
+    .closeButton {
+        position: absolute;
+        top: 10px;
+        left: calc(506px - 36px);
+        border: none;
+        margin: 0;
+        height: 25px;
+        width: 25px;
+        border-radius: 100%;
+        transition-duration: 250ms;
+        background-color: rgba(255, 255, 255, 0.0);
+    }
+    
+    .closeButton:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .closeButton:active {
+        transform: scale(0.95);
+    }
+    
+    .closeButton p {
+        margin: 0;
+        transform: translateY(-1px);
+        color: white;
+        opacity: 0.5;
+        transition-duration: 250ms;
+    }
+    
+    .closeButton:hover p {
+        opacity: 1;
+    }
+    
+    .hsplit {
+        display: flex;
+        justify-content: space-between;
+    }
+    
+    .hsplit p,
+    h4 {
+        margin: 0;
+        margin-top: auto;
+        margin-bottom: auto;
+    }
+    
+    .closeButtonSub {
+        border: none;
+        margin: 0;
+        height: 25px;
+        border-radius: 10px;
+        transition-duration: 250ms;
+        background-color: rgba(255, 255, 255, 0.0);
+        color: white;
+        opacity: 0.4;
+    }
+    
+    .closeButtonSub:hover {
+        opacity: 1;
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .closeButtonSub:active {
+        transform: scale(0.95);
+    }
+    
+    .spBt {
+        border: none;
+        margin: 0;
+        height: 25px;
+        border-radius: 10px;
+        transition-duration: 250ms;
+        background-color: #76f066;
+        opacity: 1;
+        color: black;
+    }
+    
+    .spBt:hover {
+        opacity: 0.8;
+    }
+    
+    .spBt:active {
+        transform: scale(0.95);
+    }
+    
+    .closeHolder {
+        display: flex;
+        gap: 10px;
+        position: absolute;
+        top: 0px;
+        width: calc(506px - 30px);
+        justify-content: flex-end;
+        padding: 10px 15px;
+    }
+</style>
+
+<body>
+    <div class="holder">
+        <!--Top-->
+        <div class="topSplit">
+            <!--Image-->
+            <img id="img" src="../icon.png">
+
+            <!--InfoHolder-->
+            <div class="insideSlit">
+                <!--Title-->
+                <div class="title" style="margin-top: 10px;">
+                    <h2>Sims 4 Mod Manager</h2>
+                    <p>by GameTimeDev</p>
+                </div>
+
+                <!--Values-->
+                <div class="statsHolder">
+                    <p id="line_2"></p>
+                    <p id="line_1">Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <!--Loading Bar-->
+        <progress id="progress" value="0" max="140"></progress>
+    </div>
+
+    <!--Close
+    <button class="closeButton" onclick="closeApp()">
+        <p>&#10006;</p>
+    </button>-->
+
+    <!--Close-->
+    <div class="closeHolder">
+        <button class="closeButtonSub" style="width: auto; position:relative !important;" onclick="changeAdvancedPopup(true)">Advanced</button>
+        <button class="closeButtonSub" style="width: auto; position:relative !important;" onclick="closeApp()">Close</button>
+    </div>
+
+    <!--CF Close-->
+    <div class="holder infoBox" id="box_cf_long_load">
+        <p class="infoText ">Syncing your mods with CurseForge may take a while for larger mod folders. If you don't want to use the CurseForge features, you can turn them off and skip this step.</p>
+        <div style="display: flex; gap: 5px; flex-direction: column;">
+            <button class="infoButton " onclick="disableCurseForge()">Turn off CurseForge</button>
+            <button class="infoButton infoButtonAlt" onclick="keepCurseForge()">Keep CurseForge on</button>
+        </div>
+    </div>
+
+
+    <!--Extra Options-->
+    <div id="box_advanced" class="holder" style="position: absolute;  left: 0; display: none; flex-direction: column; gap: 10px; overflow-y: auto; top: 0;">
+        <div class="hsplit">
+            <h4>Advanced</h4>
+            <button class="closeButtonSub" style="width: auto; position:relative !important;" onclick="changeAdvancedPopup(false)">Back</button>
+        </div>
+
+        <div class="hsplit">
+            <p>Logs</p>
+            <button class="spBt" onclick="openLogsFolder()">Open logs</button>
+        </div>
+    </div>
+
+    <script src="./splash.js "></script>
+</body>
+
+</html>

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Please select your Sims 4 Mod Folder</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<style>
+    body {
+        padding: 0px;
+        margin: 0px;
+        color: rgb(202, 202, 202);
+        font-family: Verdana, sans-serif;
+        overflow: hidden;
+        -webkit-user-select: none;
+        /* Safari */
+        -moz-user-select: none;
+        /* Firefox */
+        -ms-user-select: none;
+        /* IE10+/Edge */
+        user-select: none;
+        /* Standard */
+    }
+    
+    .holder {
+        width: calc(100vw - 42px);
+        height: calc(100vh - 26px);
+        background-color: #191919;
+        border-radius: 25px;
+        padding: 12px 20px;
+        border: solid 1px #5d5d5d;
+    }
+    
+    img {
+        width: 150px;
+        height: 150px;
+        margin-right: 12px;
+        /*filter: grayscale();*/
+    }
+    
+    progress {
+        border-radius: 10px;
+        height: 20px;
+        width: 100%;
+        margin-top: 10px;
+    }
+    
+    progress::-webkit-progress-bar {
+        background-color: #404040;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    progress::-webkit-progress-value {
+        background-color: #76f066;
+        border-radius: 10px;
+    }
+    
+    .topSplit {
+        display: flex;
+        flex-direction: row;
+    }
+    
+    .insideSlit {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    
+    .title h2 {
+        margin: 0px;
+        margin-top: 20px;
+        color: white;
+    }
+    
+    .title p {
+        margin: 0px;
+    }
+    
+    .statsHolder p {
+        margin: 0px;
+        font-size: 0.8em;
+    }
+    
+    .pathBox {
+        background-color: #262626;
+        border-radius: 7px;
+        padding: 8px;
+    }
+    
+    .pathBoxInner {
+        display: flex;
+        justify-content: space-between;
+    }
+    
+    .pathBoxInner p {
+        color: white;
+        margin: 0;
+        margin-top: auto;
+        margin-bottom: auto;
+    }
+    
+    .pathBoxInner button {
+        background-color: #76f066;
+        border: none;
+        border-radius: 7px;
+        height: 27px;
+    }
+    
+    .pathBoxInner button:hover {
+        background-color: #58ad4c;
+    }
+    
+    .pathBoxInner input {
+        background-color: #444444;
+        border: none;
+        border-radius: 7px;
+        height: 25px;
+        flex-grow: 1;
+        margin-left: 5px;
+        margin-right: 5px;
+        color: white;
+    }
+    
+    .pathInfo {
+        font-size: 0.7em;
+        margin: 0;
+        text-align: center;
+        margin-top: 5px;
+        opacity: 0.5;
+    }
+    
+    .button_GoBack {
+        background-color: transparent;
+        border: none;
+        color: grey;
+        padding: 5px;
+        border-radius: 7px;
+        transition-duration: 150ms;
+    }
+    
+    .button_GoBack:hover {
+        background-color: #ffffff10;
+        color: white;
+    }
+    
+    .button_Confirm {
+        background-color: #76f066;
+        border: none;
+        color: black;
+        padding: 5px;
+        border-radius: 7px;
+        transition-duration: 150ms;
+    }
+    
+    .button_Confirm:disabled {
+        opacity: 0.4;
+    }
+    
+    .button_Confirm:enabled:hover {
+        background-color: #58ad4c;
+    }
+    
+    .aClick {
+        opacity: 0.3;
+        font-size: 0.7em;
+        margin: auto;
+    }
+    
+    .aClick:hover {
+        opacity: 1;
+        color: white;
+        text-decoration: underline;
+    }
+    
+     :focus {
+        outline: none !important;
+    }
+</style>
+
+<body>
+    <div class="holder">
+        <p style="text-align: center;">The path to your Sims 4 mod folder could not be detected. Please select the path manually. </p>
+
+        <div class="pathBox">
+            <div class="pathBoxInner">
+                <p>Mod Folder: </p>
+                <div style="flex-grow:1; display:flex;">
+                    <input type="text" id="input_modFolder" readonly name="path">
+                    <button id="bt_change_modFolder">Change path</button>
+                </div>
+            </div>
+            <p class="pathInfo">Windows default - C:\Users\(Username)\Documents\Electronic Arts\The Sims 4\Mods</p>
+        </div>
+        <br>
+        <div class="pathBox">
+            <div class="pathBoxInner">
+                <p>Sims 4 Folder: </p>
+                <div style="flex-grow:1; display:flex;">
+                    <input type="text" id="input_simsFolder" readonly name="path">
+                    <button id="bt_change_simsFolder">Change path</button>
+                </div>
+            </div>
+            <p class="pathInfo">(This path is optional)</p>
+            <p class="pathInfo">Windows default - C:\Users\(Username)\Documents\Electronic Arts\The Sims 4</p>
+        </div>
+
+        <br>
+        <!--Buttons-->
+        <div style="display: flex; justify-content:space-between;">
+            <button id="bt_back" class="button_GoBack">Close Application</button>
+            <a id="a_help" class="aClick"><span style="font-weight: 600;">Click</span> here for more information.</a>
+            <button id="bt_confirm" class="button_Confirm" disabled>Save & continue</button>
+        </div>
+
+    </div>
+    <script src="./pathPopup.js"></script>
+</body>
+
+</html>
