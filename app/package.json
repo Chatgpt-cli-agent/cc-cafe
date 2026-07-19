@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
     "build": "next build && tsc -p tsconfig.main.json && node scripts/copy-core.js",
-    "start": "powershell -Command \"$env:NODE_ENV='production'; electron .\"",
+    "start": "cross-env NODE_ENV=production electron .",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
