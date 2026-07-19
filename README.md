@@ -5,9 +5,10 @@ CC Café is an open-source Sims 4 mod manager built as a monolithic Electron + N
 ## What It Does
 
 - CurseForge browse, creators, downloads, and updates
-- Local mod import and profile management
+- Local mod import (.package, .ts4script, .zip, .rar) and profile management
 - Fake mod detection and reporting
 - S4MM-style tools for duplicate scans, CC package analysis, ID conflict checks, polygon scans, empty folder cleanup, and pack disable commands
+- S4MM 2.0 tool ports: CurseForge fingerprint matching, 3D CAS viewer, HQ texture scan, merged package extraction, loading screen and main menu creators, TGI checker, region map checker, and save file reader
 - Sims Log Enabler installation and game log viewing
 
 ## Repository Layout
