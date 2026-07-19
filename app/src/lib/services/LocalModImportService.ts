@@ -57,7 +57,7 @@ export interface ImportSummary {
  * Service for importing local mod files using Electron
  */
 export class LocalModImportService {
-  private readonly VALID_EXTENSIONS = ['.package', '.ts4script', '.zip'];
+  private readonly VALID_EXTENSIONS = ['.package', '.ts4script', '.zip', '.rar'];
 
   /**
    * Open file picker and import selected mod files
@@ -82,7 +82,7 @@ export class LocalModImportService {
       filters: [
         {
           name: 'Sims 4 Mods',
-          extensions: ['package', 'ts4script', 'zip'],
+          extensions: ['package', 'ts4script', 'zip', 'rar'],
         },
       ],
     });
@@ -119,6 +119,29 @@ export class LocalModImportService {
       });
 
       try {
+        // RAR archives are extracted first (S4MM 2.0 parity) and their Sims
+        // files imported individually.
+        if (fileName.toLowerCase().endsWith('.rar')) {
+          const rarResults = await this.processRarArchive(
+            filePath,
+            activeProfile.id,
+            onFakeDetection
+          );
+          for (const processResult of rarResults) {
+            if (processResult.success && processResult.profileMod) {
+              summary.successful++;
+              summary.importedMods.push(processResult.profileMod);
+            } else {
+              summary.failed++;
+              summary.errors.push({
+                fileName: processResult.fileName,
+                error: processResult.error || 'Unknown error',
+              });
+            }
+          }
+          continue;
+        }
+
         const processResult = await this.processModFile(
           filePath,
           fileName,
@@ -253,6 +276,59 @@ export class LocalModImportService {
   }
 
   /**
+   * Extract a RAR archive to a temp folder and import each contained Sims
+   * file (.package/.ts4script) individually.
+   */
+  private async processRarArchive(
+    filePath: string,
+    profileId: string,
+    onFakeDetection?: FakeDetectionCallback
+  ): Promise<SingleFileResult[]> {
+    const tempDir = await this.createTempDir();
+    const results: SingleFileResult[] = [];
+
+    try {
+      const extraction = await window.electron.ipcRenderer.invoke('s4mm:archive-extract-all', {
+        archivePath: filePath,
+        outputDir: tempDir,
+      });
+      if (extraction && extraction.success === false) {
+        throw new Error(extraction.error || 'Failed to extract RAR archive');
+      }
+
+      const simsFiles: string[] = (extraction?.extractedFiles ?? []).filter((extracted: string) => {
+        const lower = extracted.toLowerCase();
+        return lower.endsWith('.package') || lower.endsWith('.ts4script');
+      });
+
+      if (simsFiles.length === 0) {
+        const fileName = await window.electron.ipcRenderer.invoke('path:basename', filePath);
+        return [
+          {
+            success: false,
+            fileName,
+            modName: '',
+            error: 'No Sims 4 files found in the RAR archive',
+          },
+        ];
+      }
+
+      for (const extractedPath of simsFiles) {
+        const extractedName = await window.electron.ipcRenderer.invoke(
+          'path:basename',
+          extractedPath
+        );
+        results.push(
+          await this.processModFile(extractedPath, extractedName, profileId, onFakeDetection)
+        );
+      }
+      return results;
+    } finally {
+      await this.cleanupTemp(tempDir);
+    }
+  }
+
+  /**
    * Extract mod name from filename
    *
    * @param fileName - File name with extension
@@ -261,7 +337,7 @@ export class LocalModImportService {
    */
   private extractModName(fileName: string): string {
     // Remove extension
-    const nameWithoutExt = fileName.replace(/\.(package|ts4script|zip)$/i, '');
+    const nameWithoutExt = fileName.replace(/\.(package|ts4script|zip|rar)$/i, '');
 
     // Sanitize special characters
     const sanitized = nameWithoutExt

@@ -17,6 +17,14 @@ import {
 } from '@/lib/services/AdvancedToolsService';
 import DisablePacksPanel from '@/components/tools/DisablePacksPanel';
 import CcDetectPanel from '@/components/tools/CcDetectPanel';
+import FingerprintPanel from '@/components/tools/FingerprintPanel';
+import HqTexturesPanel from '@/components/tools/HqTexturesPanel';
+import MergeToolPanel from '@/components/tools/MergeToolPanel';
+import CreatorToolsPanel from '@/components/tools/CreatorToolsPanel';
+import TgiCheckerPanel from '@/components/tools/TgiCheckerPanel';
+import RegionMapPanel from '@/components/tools/RegionMapPanel';
+import SaveFilesPanel from '@/components/tools/SaveFilesPanel';
+import ObjectViewerPanel from '@/components/tools/ObjectViewerPanel';
 import { useToast } from '@/context/ToastContext';
 import {
   ArrowClockwise,
@@ -41,7 +49,25 @@ type ToolId =
   | 'id-conflicts'
   | 'mesh-polycount'
   | 'disable-packs'
-  | 'empty-folders';
+  | 'empty-folders'
+  | 'fingerprint-match'
+  | 'hq-textures'
+  | 'merge-tool'
+  | 'creator-tools'
+  | 'tgi-checker'
+  | 'region-map'
+  | 'save-files'
+  | 'object-viewer';
+
+type PanelToolId =
+  | 'fingerprint-match'
+  | 'hq-textures'
+  | 'merge-tool'
+  | 'creator-tools'
+  | 'tgi-checker'
+  | 'region-map'
+  | 'save-files'
+  | 'object-viewer';
 
 type ToolStatus = 'ready';
 
@@ -135,6 +161,57 @@ const utilityTools: ToolDefinition[] = [
     id: 'empty-folders',
     title: 'Empty folders',
     description: 'Find empty folders and delete them.',
+    status: 'ready',
+  },
+];
+
+const s4mmTools: ToolDefinition[] = [
+  {
+    id: 'fingerprint-match',
+    title: 'CurseForge fingerprint matcher',
+    description: 'Identifies local files on CurseForge by fingerprint, even after renaming.',
+    status: 'ready',
+  },
+  {
+    id: 'object-viewer',
+    title: '3D CAS viewer',
+    description: 'View CAS meshes (LODs, swatches, textures) from package files in 3D.',
+    status: 'ready',
+  },
+  {
+    id: 'hq-textures',
+    title: 'HQ textures',
+    description: 'Finds oversized CAS textures that can slow the game down.',
+    status: 'ready',
+  },
+  {
+    id: 'merge-tool',
+    title: 'Merged packages',
+    description: 'Inspect Sims 4 Studio merged packages and extract their contents.',
+    status: 'ready',
+  },
+  {
+    id: 'creator-tools',
+    title: 'Loading screen & main menu creator',
+    description: 'Create custom loading screen and main menu override packages from images.',
+    status: 'ready',
+  },
+  {
+    id: 'tgi-checker',
+    title: 'TGI checker (CAS)',
+    description: 'Finds CAS parts with broken mesh or texture references.',
+    status: 'ready',
+  },
+  {
+    id: 'region-map',
+    title: 'Region map checker',
+    description: 'Detects CAS meshes that deform body regions they should not touch.',
+    status: 'ready',
+  },
+  {
+    id: 'save-files',
+    title: 'Save files',
+    description: 'Read Sims 4 save files and show slot names and household data.',
     status: 'ready',
   },
 ];
@@ -252,8 +329,10 @@ export default function ToolsPage() {
   const [showDisablePacks, setShowDisablePacks] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRevertConfirm, setShowRevertConfirm] = useState(false);
+  const [activePanel, setActivePanel] = useState<PanelToolId | null>(null);
   const ccDetectRef = useRef<HTMLDivElement>(null);
   const disablePacksRef = useRef<HTMLDivElement>(null);
+  const s4mmPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void loadModsPath();
@@ -274,6 +353,14 @@ export default function ToolsPage() {
       });
     }
   }, [showCcDetect]);
+
+  useEffect(() => {
+    if (activePanel) {
+      requestAnimationFrame(() => {
+        s4mmPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  }, [activePanel]);
 
   async function loadModsPath() {
     const path = await filesystemToolsService.getModsPath();
@@ -297,6 +384,20 @@ export default function ToolsPage() {
 
     if (toolId === 'disable-packs') {
       setShowDisablePacks(true);
+      return;
+    }
+
+    if (
+      toolId === 'fingerprint-match' ||
+      toolId === 'hq-textures' ||
+      toolId === 'merge-tool' ||
+      toolId === 'creator-tools' ||
+      toolId === 'tgi-checker' ||
+      toolId === 'region-map' ||
+      toolId === 'save-files' ||
+      toolId === 'object-viewer'
+    ) {
+      setActivePanel(toolId);
       return;
     }
 
@@ -494,6 +595,29 @@ export default function ToolsPage() {
             {showDisablePacks && (
               <div ref={disablePacksRef}>
                 <DisablePacksPanel onClose={() => setShowDisablePacks(false)} />
+              </div>
+            )}
+
+            <SectionCard
+              title="S4MM tools"
+              description="Advanced tooling ported from Sims 4 Mod Manager 2.0: fingerprint matching, 3D preview, creators, and deep package checks."
+              icon={Toolbox}
+            >
+              {s4mmTools.map((tool) => (
+                <ToolRow key={tool.id} tool={tool} onOpen={handleOpen} compact={compactView} />
+              ))}
+            </SectionCard>
+
+            {activePanel && (
+              <div ref={s4mmPanelRef}>
+                {activePanel === 'fingerprint-match' && <FingerprintPanel onClose={() => setActivePanel(null)} />}
+                {activePanel === 'hq-textures' && <HqTexturesPanel onClose={() => setActivePanel(null)} />}
+                {activePanel === 'merge-tool' && <MergeToolPanel onClose={() => setActivePanel(null)} />}
+                {activePanel === 'creator-tools' && <CreatorToolsPanel onClose={() => setActivePanel(null)} />}
+                {activePanel === 'tgi-checker' && <TgiCheckerPanel onClose={() => setActivePanel(null)} />}
+                {activePanel === 'region-map' && <RegionMapPanel onClose={() => setActivePanel(null)} />}
+                {activePanel === 'save-files' && <SaveFilesPanel onClose={() => setActivePanel(null)} />}
+                {activePanel === 'object-viewer' && <ObjectViewerPanel onClose={() => setActivePanel(null)} />}
               </div>
             )}
 

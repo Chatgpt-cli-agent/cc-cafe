@@ -1,8 +1,17 @@
+import fs from 'fs';
+import path from 'path';
+
 const { ArchiveUtil } = require('../../core2/ArchiveUtil');
 
+export interface ArchiveEntry {
+  name: string;
+  internalPath: string;
+  size: number;
+}
+
 export interface ArchiveListResult {
-  files: string[];
-  simsFiles: string[];
+  files: ArchiveEntry[];
+  simsFiles: ArchiveEntry[];
   containsSimsFiles: boolean;
 }
 
@@ -13,8 +22,8 @@ export interface ArchiveListResult {
  */
 export class ArchiveService {
   async listContents(archivePath: string): Promise<ArchiveListResult> {
-    const files: string[] = await ArchiveUtil.getFileListFromArchive(archivePath);
-    const simsFiles: string[] = ArchiveUtil.filterSimsFiles(files);
+    const files: ArchiveEntry[] = await ArchiveUtil.getFileListFromArchive(archivePath);
+    const simsFiles: ArchiveEntry[] = ArchiveUtil.filterSimsFiles(files);
     return {
       files,
       simsFiles,
@@ -26,8 +35,20 @@ export class ArchiveService {
     return ArchiveUtil.extractFileFromArchive(archivePath, internalPath);
   }
 
-  async extractAll(archivePath: string, outputDir: string): Promise<string[]> {
-    return ArchiveUtil.extractAllFromArchive(archivePath, outputDir);
+  async extractAll(archivePath: string, outputDir: string): Promise<{ extractedFiles: string[] }> {
+    fs.mkdirSync(outputDir, { recursive: true });
+    await ArchiveUtil.extractAllFromArchive(archivePath, outputDir);
+
+    const extractedFiles: string[] = [];
+    const walk = (current: string) => {
+      for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+        const fullPath = path.join(current, entry.name);
+        if (entry.isDirectory()) walk(fullPath);
+        else extractedFiles.push(fullPath);
+      }
+    };
+    walk(outputDir);
+    return { extractedFiles };
   }
 }
 
