@@ -426,8 +426,8 @@ export default function CurseForgeHub({
   ];
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-      <div className="px-8 pt-7 pb-4">
+    <div className="flex min-h-0 flex-1 flex-col min-w-0 overflow-hidden">
+      <div className="shrink-0 px-8 pt-7 pb-4">
         <div className="flex items-end justify-between gap-4">
           <h1 className="text-3xl font-bold text-white">CurseForge</h1>
           <span className="pb-1 text-xs font-bold uppercase tracking-wide text-brand-green">
@@ -451,7 +451,7 @@ export default function CurseForgeHub({
       </div>
 
       {activeTab === 'browse' && (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <FilterBar
             onSortChange={onSortChange}
             activeSort={sortBy}
@@ -470,7 +470,7 @@ export default function CurseForgeHub({
             activeFilter={activeFilter}
             scrollIndex={scrollIndex}
           />
-        </>
+        </div>
       )}
 
       {activeTab === 'home' && (

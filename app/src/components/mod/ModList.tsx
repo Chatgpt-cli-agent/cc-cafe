@@ -337,23 +337,26 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
     }
   }, [mods.length, scrollIndex, isLoading, viewMode, gridColumns]);
 
-  // Virtualized infinite scroll - load when approaching end
-  const handleRowsRendered = useCallback(
-    (visibleRows: any, allRows: any) => {
-      // Use gridRows for grid view, mods for list view
-      const totalRows = viewMode === 'grid' ? gridRows.length : mods.length;
-      const { stopIndex } = visibleRows;
+  const loadNextPage = useCallback(() => {
+    if (!hasMore || isLoadingMore || isLoading) return;
+    const nextPageIndex = paginationRef.current.index + 1;
+    fetchModsForPage(nextPageIndex).catch(() => {
+      setError('Failed to load more mods');
+    });
+  }, [hasMore, isLoadingMore, isLoading, fetchModsForPage]);
 
-      // Trigger load when we're in the last 10 items
-      if (stopIndex >= totalRows - 10 && hasMore && !isLoadingMore) {
-        const nextPageIndex = paginationRef.current.index + 1;
-        fetchModsForPage(nextPageIndex).catch((err) => {
-          setError('Failed to load more mods');
-        });
-      }
-    },
-    [hasMore, isLoadingMore, fetchModsForPage, mods.length, viewMode, gridRows.length]
-  );
+  /**
+   * Dense S4MM grids fit an entire page of mods on screen, so Virtuoso never
+   * reaches the end and infinite scroll stalls. Prefetch until we have enough
+   * rows to scroll (or the API has no more pages).
+   */
+  useEffect(() => {
+    if (viewMode !== 'grid') return;
+    if (!hasMore || isLoadingMore || isLoading) return;
+    if (mods.length === 0) return;
+    if (gridRows.length >= 18) return;
+    loadNextPage();
+  }, [viewMode, hasMore, isLoadingMore, isLoading, mods.length, gridRows.length, loadNextPage]);
 
   /**
    * Track scroll position when user scrolls (following Virtuoso documentation)
@@ -413,12 +416,8 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
     );
   }
 
-  // Calculate row heights
-  const listRowHeight = 96; // 80px for item + 16px for spacing
-  const gridRowHeight = 400; // Height for grid row (cards with image + content + padding)
-
   return (
-    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Column Headers - Only for list view */}
       {viewMode === 'list' && (
         <div className="flex-shrink-0 grid grid-cols-12 gap-4 px-4 lg:px-8 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 border-b" style={{ backgroundColor: 'var(--ui-dark)', color: 'var(--text-secondary)', borderColor: 'var(--ui-border)' }}>
@@ -437,7 +436,8 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
           <Virtuoso
             ref={listRef}
             data={mods}
-            style={{ height: '100%', scrollbarWidth: 'none' }}
+            className="min-h-0 flex-1"
+            style={{ height: '100%' }}
             initialTopMostItemIndex={scrollIndex > 0 ? scrollIndex + 1 : 0}
             itemContent={(index, mod) => (
               <div className="px-4 lg:px-8 py-2">
@@ -445,36 +445,27 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
               </div>
             )}
             rangeChanged={handleRangeChanged}
-            endReached={() => {
-              if (hasMore && !isLoadingMore) {
-                const nextPageIndex = paginationRef.current.index + 1;
-                fetchModsForPage(nextPageIndex).catch(() => {
-                  setError('Failed to load more mods');
-                });
-              }
-            }}
-            overscan={10}
+            endReached={loadNextPage}
+            increaseViewportBy={{ top: 200, bottom: 800 }}
+            atBottomThreshold={400}
+            overscan={20}
           />
         ) : (
           // GRID VIEW - Virtualized with Virtuoso
           <Virtuoso
             ref={listRef}
             data={gridRows}
-            style={{ height: '100%', scrollbarWidth: 'none' }}
+            className="min-h-0 flex-1"
+            style={{ height: '100%' }}
             initialTopMostItemIndex={scrollIndex > 0 ? scrollIndex + 1 : 0}
             itemContent={(index, row) => (
               <ModGridRow mods={row} index={index} columns={gridColumns} warningStatuses={warningStatuses} />
             )}
             rangeChanged={handleRangeChanged}
-            endReached={() => {
-              if (hasMore && !isLoadingMore) {
-                const nextPageIndex = paginationRef.current.index + 1;
-                fetchModsForPage(nextPageIndex).catch(() => {
-                  setError('Failed to load more mods');
-                });
-              }
-            }}
-            overscan={10}
+            endReached={loadNextPage}
+            increaseViewportBy={{ top: 200, bottom: 1200 }}
+            atBottomThreshold={600}
+            overscan={12}
           />
         )
       ) : (
@@ -485,6 +476,11 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
         </div>
       )}
 
+      {isLoadingMore && (
+        <div className="flex-shrink-0 py-2 text-center text-xs text-neutral-400">
+          Loading more…
+        </div>
+      )}
     </div>
   );
 }
