@@ -14,6 +14,7 @@ import { saveFilesService } from './services/s4mm/SaveFilesService';
 import { archiveService } from './services/s4mm/ArchiveService';
 import { objectViewerService } from './services/s4mm/ObjectViewerService';
 import { packageInspectService } from './services/s4mm/PackageInspectService';
+import { modsIndexService } from './services/s4mm/ModsIndexService';
 import { z } from 'zod';
 import fs from 'fs/promises';
 import path from 'path';
@@ -723,6 +724,50 @@ export function registerIpcHandlers() {
   ipcMain.handle('s4mm:inspect-scan', async (_event, { rootPath }) => {
     try {
       return await packageInspectService.scanFolder(rootPath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // --- Mods SQLite file index (S4MM-style) ---
+
+  ipcMain.handle('s4mm:mods-index-status', async () => {
+    try {
+      return await modsIndexService.getStatus();
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('s4mm:mods-index-rebuild', async (event, { rootPath, full }) => {
+    try {
+      if (!rootPath || typeof rootPath !== 'string') {
+        throw new Error('Mods folder path is required');
+      }
+      return await modsIndexService.rebuild(rootPath, {
+        full: Boolean(full),
+        onProgress: (progress) => {
+          event.sender.send('s4mm:mods-index-progress', progress);
+        },
+      });
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('s4mm:mods-index-clear', async () => {
+    try {
+      await modsIndexService.clear();
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('s4mm:mods-index-abort', async () => {
+    try {
+      modsIndexService.requestAbort();
+      return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
     }

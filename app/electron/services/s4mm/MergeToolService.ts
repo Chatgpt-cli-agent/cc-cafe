@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { walkPackageFiles } from './walkPackages';
+import { modsIndexService } from './ModsIndexService';
 
 const { Pack } = require('../../core2/DBPFReader');
 const { PackageOperations } = require('../../core2/PackageOperations');
@@ -30,7 +31,8 @@ export interface MergedScanResult {
  */
 export class MergeToolService {
   async scanMergedPackages(rootPath: string): Promise<MergedScanResult> {
-    const packageFiles = await walkPackageFiles(rootPath);
+    const indexedMerged = await modsIndexService.listMergedPackagePaths(rootPath);
+    const packageFiles = indexedMerged ?? (await walkPackageFiles(rootPath));
     const items: MergedFileInfo[] = [];
 
     for (const filePath of packageFiles) {

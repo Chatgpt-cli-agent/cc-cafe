@@ -126,6 +126,38 @@ export interface PackageInspection {
   xmlTypes: string;
 }
 
+export interface ModsIndexStatus {
+  rootPath: string | null;
+  lastRebuildAt: number | null;
+  fileCount: number;
+  packageCount: number;
+  scriptCount: number;
+  otherCount: number;
+  entryCount: number;
+  fingerprintCount: number;
+  mergedCount: number;
+  caspCount: number;
+  isBuilding: boolean;
+}
+
+export interface ModsIndexRebuildResult {
+  rootPath: string;
+  scanned: number;
+  upserted: number;
+  unchanged: number;
+  pruned: number;
+  errors: number;
+  durationMs: number;
+}
+
+export interface ModsIndexProgress {
+  phase: 'scan' | 'index' | 'prune' | 'done';
+  current: number;
+  total: number;
+  fileName?: string;
+  message?: string;
+}
+
 function assertOk<T>(result: T & { success?: boolean; error?: string }): T {
   if (result && typeof result === 'object' && (result as any).success === false) {
     throw new Error((result as any).error || 'Operation failed');
@@ -243,6 +275,27 @@ class S4mmToolsService {
 
   inspectFolder(rootPath: string) {
     return this.invoke<{ items: PackageInspection[]; fileCount: number }>('s4mm:inspect-scan', { rootPath });
+  }
+
+  // Mods file index
+  getModsIndexStatus() {
+    return this.invoke<ModsIndexStatus>('s4mm:mods-index-status');
+  }
+
+  rebuildModsIndex(rootPath: string, full = false) {
+    return this.invoke<ModsIndexRebuildResult>('s4mm:mods-index-rebuild', { rootPath, full });
+  }
+
+  clearModsIndex() {
+    return this.invoke<{ success: boolean }>('s4mm:mods-index-clear');
+  }
+
+  abortModsIndexRebuild() {
+    return this.invoke<{ success: boolean }>('s4mm:mods-index-abort');
+  }
+
+  onModsIndexProgress(handler: (progress: ModsIndexProgress) => void) {
+    return window.electron.ipcRenderer.on('s4mm:mods-index-progress', handler);
   }
 }
 

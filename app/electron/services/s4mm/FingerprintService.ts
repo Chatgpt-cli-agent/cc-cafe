@@ -1,6 +1,7 @@
 import path from 'path';
 import axios from 'axios';
 import { walkFiles } from './walkPackages';
+import { modsIndexService } from './ModsIndexService';
 
 const { Fingerprint } = require('../../core2/Fingerprint');
 
@@ -43,6 +44,11 @@ export class FingerprintService {
   }
 
   async scanFolder(rootPath: string): Promise<FingerprintScanResult> {
+    const indexed = await modsIndexService.listFingerprintedFiles(rootPath);
+    if (indexed) {
+      return { files: indexed, fileCount: indexed.length };
+    }
+
     const files = await walkFiles(rootPath, ['.package', '.ts4script', '.zip', '.rar']);
     const results: FingerprintedFile[] = [];
 
