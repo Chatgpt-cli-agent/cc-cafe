@@ -56,3 +56,63 @@ model BannedCreator {
   @@index([creatorId])
   @@map("banned_creators")
 }
+
+/// S4MM-style mods folder file index.
+/// One row per filesystem inode under the configured Mods root.
+/// type: 1 = package, 2 = script, 3 = other (zip/rar/etc.)
+model ModIndexFile {
+  ino         String   @id
+  rootPath    String
+  path        String
+  mfolder     String   @default("")
+  name        String
+  type        Int
+  minor       Int      @default(-1)
+  major       Int      @default(-1)
+  casp        Boolean  @default(false)
+  cobj        Boolean  @default(false)
+  clip        Boolean  @default(false)
+  smod        Boolean  @default(false)
+  xmlTypes    String   @default("") @map("xml_types")
+  merged      Boolean  @default(false)
+  recolor     Boolean  @default(false)
+  fingerprint Int      @default(-1)
+  mtime       Int
+  size        Int
+  lastCheck   Int      @map("last_check")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  entries     ModIndexEntry[]
+
+  @@index([rootPath])
+  @@index([type])
+  @@index([fingerprint])
+  @@index([merged])
+  @@index([casp])
+  @@map("mod_index_files")
+}
+
+/// Resource TGI entries extracted from indexed package files.
+model ModIndexEntry {
+  id          Int    @id @default(autoincrement())
+  ino         String
+  type        Int
+  group       Int
+  instance    String
+  instanceHex String @map("instancehex")
+  address     String
+  file        ModIndexFile @relation(fields: [ino], references: [ino], onDelete: Cascade)
+
+  @@index([ino])
+  @@index([address])
+  @@index([type])
+  @@map("mod_index_entries")
+}
+
+/// Key/value metadata for the mods file index (root path, last rebuild, etc.)
+model ModIndexMeta {
+  key   String @id
+  value String
+
+  @@map("mod_index_meta")
+}

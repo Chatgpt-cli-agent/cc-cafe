@@ -1,5 +1,6 @@
 import path from 'path';
 import { walkPackageFiles } from './walkPackages';
+import { modsIndexService } from './ModsIndexService';
 
 const { Pack } = require('../../core2/DBPFReader');
 const { RMAPUtils } = require('../../core2/RegionMapCalulations');
@@ -51,6 +52,15 @@ export interface RegionMapOptions {
  */
 export class RegionMapService {
   async findFilesWithRegionMaps(rootPath: string): Promise<RegionMapScanResult> {
+    const indexed = await modsIndexService.listPackagePathsWithResourceType(rootPath, RMAP_TYPE);
+    if (indexed) {
+      const files = indexed.map((filePath) => ({
+        path: path.dirname(filePath),
+        name: path.basename(filePath),
+      }));
+      return { files, fileCount: indexed.length };
+    }
+
     const packageFiles = await walkPackageFiles(rootPath);
     const files: { path: string; name: string }[] = [];
 

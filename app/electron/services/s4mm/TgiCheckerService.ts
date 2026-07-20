@@ -1,5 +1,6 @@
 import path from 'path';
 import { walkPackageFiles } from './walkPackages';
+import { modsIndexService } from './ModsIndexService';
 
 const { Pack } = require('../../core2/DBPFReader');
 
@@ -24,10 +25,9 @@ export interface TgiCheckResult {
 
 /**
  * Standalone port of the S4MM 2.0 TGI checker (utils/TGICheck.js +
- * tools/tgichecker.tools.js). S4MM resolves CAS part TGI references against
- * its SQLite index of mod and game resources; this port builds the address
- * set by scanning the mods folder directly, then reports CAS parts whose
- * LOD/diffuse references cannot be resolved by any scanned package.
+ * tools/tgichecker.tools.js). When the mods SQLite file index is available,
+ * resource addresses and CAS package candidates are loaded from it (like
+ * S4MM). Otherwise the mods folder is scanned directly.
  *
  * Note: references satisfied by game packages cannot be verified without the
  * game install, so items resolved only by the game may show as missing. The
@@ -36,33 +36,54 @@ export interface TgiCheckResult {
  */
 export class TgiCheckerService {
   async check(rootPath: string, threshold = 1): Promise<TgiCheckResult> {
-    const packageFiles = await walkPackageFiles(rootPath);
+    const indexedAddresses = await modsIndexService.getAllAddresses(rootPath);
+    const indexedCaspPaths = await modsIndexService.listCaspPackagePaths(rootPath);
 
-    // Pass 1: collect every resource address available in the mods folder.
-    const knownAddresses = new Set<string>();
-    const caspSources: { filePath: string; pack: any }[] = [];
+    let knownAddresses: Set<string>;
+    let caspSources: { filePath: string; pack: any }[] = [];
+    let fileCount: number;
 
-    for (const filePath of packageFiles) {
-      try {
-        const pack = new Pack(filePath);
-        pack.checkFile();
-        if (pack.error) continue;
-        pack.calculateIndexList();
-
-        let hasCasp = false;
-        for (const entry of pack.index_List || []) {
-          knownAddresses.add(String(entry.getKey()).toLowerCase());
-          if (entry.r_type === 0x034aeecb) hasCasp = true;
-        }
-        if (hasCasp) {
+    if (indexedAddresses && indexedCaspPaths) {
+      knownAddresses = indexedAddresses;
+      fileCount = indexedCaspPaths.length;
+      for (const filePath of indexedCaspPaths) {
+        try {
+          const pack = new Pack(filePath);
+          pack.checkFile();
+          if (pack.error) continue;
+          pack.calculateIndexList();
           caspSources.push({ filePath, pack });
+        } catch (error) {
+          console.error('[TgiCheckerService] Failed to open indexed CAS package', filePath, error);
         }
-      } catch (error) {
-        console.error('[TgiCheckerService] Failed to index', filePath, error);
+      }
+    } else {
+      const packageFiles = await walkPackageFiles(rootPath);
+      fileCount = packageFiles.length;
+      knownAddresses = new Set<string>();
+
+      for (const filePath of packageFiles) {
+        try {
+          const pack = new Pack(filePath);
+          pack.checkFile();
+          if (pack.error) continue;
+          pack.calculateIndexList();
+
+          let hasCasp = false;
+          for (const entry of pack.index_List || []) {
+            knownAddresses.add(String(entry.getKey()).toLowerCase());
+            if (entry.r_type === 0x034aeecb) hasCasp = true;
+          }
+          if (hasCasp) {
+            caspSources.push({ filePath, pack });
+          }
+        } catch (error) {
+          console.error('[TgiCheckerService] Failed to index', filePath, error);
+        }
       }
     }
 
-    // Pass 2: check every CAS part's LOD + diffuse references.
+    // Check every CAS part's LOD + diffuse references.
     const items: TgiCheckItem[] = [];
     let caspFileCount = 0;
 
@@ -119,7 +140,7 @@ export class TgiCheckerService {
     }
 
     items.sort((a, b) => b.missingReferences - a.missingReferences || a.name.localeCompare(b.name));
-    return { items, fileCount: packageFiles.length, caspFileCount };
+    return { items, fileCount, caspFileCount };
   }
 
   private normalizeAddress(address: any): string {

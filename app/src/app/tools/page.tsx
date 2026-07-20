@@ -25,6 +25,7 @@ import TgiCheckerPanel from '@/components/tools/TgiCheckerPanel';
 import RegionMapPanel from '@/components/tools/RegionMapPanel';
 import SaveFilesPanel from '@/components/tools/SaveFilesPanel';
 import ObjectViewerPanel from '@/components/tools/ObjectViewerPanel';
+import ModsIndexPanel from '@/components/tools/ModsIndexPanel';
 import { useToast } from '@/context/ToastContext';
 import {
   ArrowClockwise,
@@ -50,6 +51,7 @@ type ToolId =
   | 'mesh-polycount'
   | 'disable-packs'
   | 'empty-folders'
+  | 'mods-file-index'
   | 'fingerprint-match'
   | 'hq-textures'
   | 'merge-tool'
@@ -60,6 +62,7 @@ type ToolId =
   | 'object-viewer';
 
 type PanelToolId =
+  | 'mods-file-index'
   | 'fingerprint-match'
   | 'hq-textures'
   | 'merge-tool'
@@ -166,6 +169,12 @@ const utilityTools: ToolDefinition[] = [
 ];
 
 const s4mmTools: ToolDefinition[] = [
+  {
+    id: 'mods-file-index',
+    title: 'Mods file index',
+    description: 'Build a local SQLite catalog of your Mods folder so other S4MM tools can query it instead of rescanning.',
+    status: 'ready',
+  },
   {
     id: 'fingerprint-match',
     title: 'CurseForge fingerprint matcher',
@@ -388,6 +397,7 @@ export default function ToolsPage() {
     }
 
     if (
+      toolId === 'mods-file-index' ||
       toolId === 'fingerprint-match' ||
       toolId === 'hq-textures' ||
       toolId === 'merge-tool' ||
@@ -600,7 +610,7 @@ export default function ToolsPage() {
 
             <SectionCard
               title="S4MM tools"
-              description="Advanced tooling ported from Sims 4 Mod Manager 2.0: fingerprint matching, 3D preview, creators, and deep package checks."
+              description="Advanced tooling ported from Sims 4 Mod Manager 2.0: mods file index, fingerprint matching, 3D preview, creators, and deep package checks."
               icon={Toolbox}
             >
               {s4mmTools.map((tool) => (
@@ -610,6 +620,7 @@ export default function ToolsPage() {
 
             {activePanel && (
               <div ref={s4mmPanelRef}>
+                {activePanel === 'mods-file-index' && <ModsIndexPanel onClose={() => setActivePanel(null)} />}
                 {activePanel === 'fingerprint-match' && <FingerprintPanel onClose={() => setActivePanel(null)} />}
                 {activePanel === 'hq-textures' && <HqTexturesPanel onClose={() => setActivePanel(null)} />}
                 {activePanel === 'merge-tool' && <MergeToolPanel onClose={() => setActivePanel(null)} />}

@@ -1,5 +1,6 @@
 import path from 'path';
 import { walkPackageFiles } from './walkPackages';
+import { modsIndexService } from './ModsIndexService';
 
 const { Pack, LRLEFile, REL2File } = require('../../core2/DBPFReader');
 
@@ -36,7 +37,7 @@ export interface HqTextureScanResult {
 export class HqTexturesService {
   async scan(rootPath: string, types?: number[]): Promise<HqTextureScanResult> {
     const wantedTypes = types && types.length > 0 ? types : [TEXTURE_TYPE_LRLE, TEXTURE_TYPE_RLE2];
-    const packageFiles = await walkPackageFiles(rootPath);
+    const packageFiles = await this.resolvePackageFiles(rootPath, wantedTypes);
     const items: HqTextureItem[] = [];
 
     for (const filePath of packageFiles) {
@@ -62,6 +63,17 @@ export class HqTexturesService {
     items.sort((a, b) => b.maxWidth * b.maxHeight - a.maxWidth * a.maxHeight || a.name.localeCompare(b.name));
 
     return { items, fileCount: packageFiles.length };
+  }
+
+  /** Prefer packages known to contain the requested texture types from the index. */
+  private async resolvePackageFiles(rootPath: string, types: number[]): Promise<string[]> {
+    const indexedSets = await Promise.all(
+      types.map((type) => modsIndexService.listPackagePathsWithResourceType(rootPath, type))
+    );
+    if (indexedSets.every((set) => set !== null)) {
+      return Array.from(new Set(indexedSets.flatMap((set) => set ?? [])));
+    }
+    return walkPackageFiles(rootPath);
   }
 
   private readTextures(filePath: string, types: number[]): TextureInfo[] {
