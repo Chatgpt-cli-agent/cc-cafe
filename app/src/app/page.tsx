@@ -92,7 +92,7 @@ export default function Home() {
   async function updateWindowTitle() {
     try {
       const build = await window.electron.ipcRenderer.invoke('app:getBuildInfo');
-      const label = build?.label || `v${build?.version || '0.6.1'}`;
+      const label = build?.label || `v${build?.version || '0.6.2'}`;
       await window.electron.ipcRenderer.invoke('window:setTitle', `CC Café ${label} - Mod Manager`);
     } catch (error) {
       console.error('Failed to update window title:', error);
@@ -273,7 +273,7 @@ export default function Home() {
   return (
       <Layout>
         <main
-          className="flex-1 flex flex-col min-w-0 relative"
+          className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
           style={{
             backgroundColor: 'var(--bg-primary)',
           }}

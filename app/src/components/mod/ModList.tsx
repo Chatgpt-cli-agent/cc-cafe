@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import ModListItem from '@/components/mod/ModListItem';
-import ModGridRow from '@/components/mod/ModGridRow';
+import ModCard from '@/components/mod/ModCard';
 import { searchCurseForgeMods } from '@/lib/curseforgeApi';
 import { getBatchWarningStatus } from '@/lib/fakeDetectionApi';
 import { userPreferencesService } from '@/lib/services/UserPreferencesService';
@@ -57,10 +57,11 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
     totalCount: 0,
   });
   const [hasMore, setHasMore] = useState(true);
-  const [gridColumns, setGridColumns] = useState(4);
-  const loaderRef = useRef<HTMLDivElement>(null);
+  const [gridColumns, setGridColumns] = useState(8);
   const paginationRef = useRef<PaginationState>(pagination);
   const listRef = useRef<any>(null);
+  const gridScrollRef = useRef<HTMLDivElement>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   const hasRestoredScroll = useRef(false);
   const isRestoring = useRef(false);
   const scrollUpdateTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -99,18 +100,6 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
   useEffect(() => {
     paginationRef.current = pagination;
   }, [pagination]);
-
-  /**
-   * Group mods into rows for grid view
-   * Each row contains `gridColumns` number of mods
-   */
-  const gridRows = useMemo(() => {
-    const rows: CurseForgeMod[][] = [];
-    for (let i = 0; i < mods.length; i += gridColumns) {
-      rows.push(mods.slice(i, i + gridColumns));
-    }
-    return rows;
-  }, [mods, gridColumns]);
 
   // Convert UI sort names to API sort names
   const apiSortBy = useMemo(() => {
@@ -180,7 +169,7 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
 
     const apiParams = {
       query: searchQuery || undefined,
-      pageSize: 50,
+      pageSize: 100,
       pageIndex,
       sortBy: apiSortBy as 'downloads' | 'date' | 'popularity' | 'relevance',
       categoryName: normalizedCategory || undefined,
@@ -194,7 +183,7 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
 
       const nextPagination = {
         index: pageIndex,
-        pageSize: 50,
+        pageSize: 100,
         resultCount: result.pagination.resultCount,
         totalCount: result.pagination.totalCount,
       };
@@ -202,8 +191,8 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
       setPagination(nextPagination);
 
       // Check if there are more pages
-      const loadedCount = (pageIndex + 1) * 50;
-      const nextHasMore = loadedCount < result.pagination.totalCount;
+      const loadedCount = (pageIndex + 1) * 100;
+      const nextHasMore = loadedCount < result.pagination.totalCount && result.mods.length > 0;
       setHasMore(nextHasMore);
 
       if (pageIndex === 0) {
@@ -243,7 +232,7 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
     setWarningStatuses({});
     setPagination({
       index: 0,
-      pageSize: 50,
+      pageSize: 100,
       resultCount: 0,
       totalCount: 0,
     });
@@ -305,38 +294,6 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
     fetchWarnings();
   }, [mods]);
 
-  /**
-   * Restore scroll position after mods are loaded
-   * Uses scrollToIndex when mods arrive to handle async loading
-   */
-  useEffect(() => {
-    // Reset restoration flag when loading starts (new search, navigation back, etc.)
-    if (isLoading) {
-      hasRestoredScroll.current = false;
-      return;
-    }
-
-    // Restore scroll once when mods finish loading and we have a saved position
-    if (mods.length > 0 && scrollIndex > 0 && listRef.current && !hasRestoredScroll.current) {
-      hasRestoredScroll.current = true;
-      isRestoring.current = true;
-
-      // Use setTimeout to ensure DOM is ready
-      setTimeout(() => {
-        const targetIndex = viewMode === 'grid' ? Math.floor(scrollIndex / gridColumns) : scrollIndex;
-        listRef.current?.scrollToIndex({
-          index: targetIndex,
-          align: 'start',
-          behavior: 'auto',
-        });
-        // Allow scroll events again after restoration completes
-        setTimeout(() => {
-          isRestoring.current = false;
-        }, 200);
-      }, 0);
-    }
-  }, [mods.length, scrollIndex, isLoading, viewMode, gridColumns]);
-
   const loadNextPage = useCallback(() => {
     if (!hasMore || isLoadingMore || isLoading) return;
     const nextPageIndex = paginationRef.current.index + 1;
@@ -346,32 +303,81 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
   }, [hasMore, isLoadingMore, isLoading, fetchModsForPage]);
 
   /**
-   * Dense S4MM grids fit an entire page of mods on screen, so Virtuoso never
-   * reaches the end and infinite scroll stalls. Prefetch until we have enough
-   * rows to scroll (or the API has no more pages).
+   * Restore list Virtuoso scroll position after mods are loaded.
+   */
+  useEffect(() => {
+    if (viewMode !== 'list') return;
+    if (isLoading) {
+      hasRestoredScroll.current = false;
+      return;
+    }
+
+    if (mods.length > 0 && scrollIndex > 0 && listRef.current && !hasRestoredScroll.current) {
+      hasRestoredScroll.current = true;
+      isRestoring.current = true;
+      setTimeout(() => {
+        listRef.current?.scrollToIndex({
+          index: scrollIndex,
+          align: 'start',
+          behavior: 'auto',
+        });
+        setTimeout(() => {
+          isRestoring.current = false;
+        }, 200);
+      }, 0);
+    }
+  }, [mods.length, scrollIndex, isLoading, viewMode]);
+
+  /**
+   * Native grid scroll: load more when the bottom sentinel enters view.
+   * Avoids Virtuoso height bugs with dense S4MM-style tiles.
    */
   useEffect(() => {
     if (viewMode !== 'grid') return;
-    if (!hasMore || isLoadingMore || isLoading) return;
-    if (mods.length === 0) return;
-    if (gridRows.length >= 18) return;
-    loadNextPage();
-  }, [viewMode, hasMore, isLoadingMore, isLoading, mods.length, gridRows.length, loadNextPage]);
+    const root = gridScrollRef.current;
+    const sentinel = loadMoreSentinelRef.current;
+    if (!root || !sentinel) return;
 
-  /**
-   * Track scroll position when user scrolls (following Virtuoso documentation)
-   * Debounced to prevent excessive state updates during scroll
-   */
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadNextPage();
+        }
+      },
+      { root, rootMargin: '400px 0px', threshold: 0 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [viewMode, loadNextPage, mods.length]);
+
+  /** Keep fetching while the grid content is shorter than the viewport. */
+  useEffect(() => {
+    if (viewMode !== 'grid') return;
+    if (!hasMore || isLoadingMore || isLoading || mods.length === 0) return;
+    const root = gridScrollRef.current;
+    if (!root) return;
+    if (root.scrollHeight <= root.clientHeight + 80) {
+      loadNextPage();
+    }
+  }, [viewMode, hasMore, isLoadingMore, isLoading, mods.length, loadNextPage]);
+
+  const handleGridScroll = useCallback(() => {
+    if (isRestoring.current) return;
+    const root = gridScrollRef.current;
+    if (!root) return;
+    if (scrollUpdateTimeout.current) clearTimeout(scrollUpdateTimeout.current);
+    scrollUpdateTimeout.current = setTimeout(() => {
+      // Approximate card index from scroll position for back-navigation restore.
+      const approxRow = Math.floor(root.scrollTop / 160);
+      setScrollIndex(approxRow * gridColumns);
+    }, 150);
+  }, [gridColumns, setScrollIndex]);
+
   const handleRangeChanged = useCallback(
     (range: any) => {
-      // Skip scroll tracking during programmatic restoration to avoid feedback loop
       if (isRestoring.current) return;
-
-      // Clear any pending update
-      if (scrollUpdateTimeout.current) {
-        clearTimeout(scrollUpdateTimeout.current);
-      }
-      // Debounce the scroll index update to avoid excessive state changes
+      if (scrollUpdateTimeout.current) clearTimeout(scrollUpdateTimeout.current);
       scrollUpdateTimeout.current = setTimeout(() => {
         setScrollIndex(range.startIndex ?? 0);
       }, 150);
@@ -379,12 +385,9 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
     [setScrollIndex]
   );
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (scrollUpdateTimeout.current) {
-        clearTimeout(scrollUpdateTimeout.current);
-      }
+      if (scrollUpdateTimeout.current) clearTimeout(scrollUpdateTimeout.current);
     };
   }, []);
 
@@ -416,31 +419,42 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
     );
   }
 
+  const gridColsClass =
+    {
+      3: 'grid-cols-3',
+      5: 'grid-cols-5',
+      7: 'grid-cols-7',
+      8: 'grid-cols-8',
+      9: 'grid-cols-9',
+      10: 'grid-cols-10',
+      11: 'grid-cols-11',
+    }[gridColumns] || 'grid-cols-8';
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* Column Headers - Only for list view */}
       {viewMode === 'list' && (
-        <div className="flex-shrink-0 grid grid-cols-12 gap-4 px-4 lg:px-8 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 border-b" style={{ backgroundColor: 'var(--ui-dark)', color: 'var(--text-secondary)', borderColor: 'var(--ui-border)' }}>
+        <div
+          className="grid flex-shrink-0 grid-cols-12 gap-4 border-b px-4 py-3 text-xs font-semibold uppercase tracking-wider lg:px-8"
+          style={{ backgroundColor: 'var(--ui-dark)', color: 'var(--text-secondary)', borderColor: 'var(--ui-border)' }}
+        >
           <div className="col-span-6 lg:col-span-5">{t('mods.list.column_mod')}</div>
-          <div className="col-span-3 lg:col-span-2 hidden md:block">{t('mods.list.column_categories')}</div>
+          <div className="col-span-3 hidden md:block lg:col-span-2">{t('mods.list.column_categories')}</div>
           <div className="col-span-2 hidden lg:block">{t('mods.list.column_downloads')}</div>
-          <div className="col-span-3 lg:col-span-2 hidden lg:block text-right">{t('mods.list.column_last_update')}</div>
-          <div className="col-span-6 md:col-span-3 lg:col-span-1 text-right" />
+          <div className="col-span-3 hidden text-right lg:col-span-2 lg:block">{t('mods.list.column_last_update')}</div>
+          <div className="col-span-6 text-right md:col-span-3 lg:col-span-1" />
         </div>
       )}
 
-      {/* Virtualized List / Grid */}
       {mods.length > 0 ? (
         viewMode === 'list' ? (
-          // LIST VIEW - Virtualized with Virtuoso
           <Virtuoso
             ref={listRef}
             data={mods}
             className="min-h-0 flex-1"
             style={{ height: '100%' }}
             initialTopMostItemIndex={scrollIndex > 0 ? scrollIndex + 1 : 0}
-            itemContent={(index, mod) => (
-              <div className="px-4 lg:px-8 py-2">
+            itemContent={(_index, mod) => (
+              <div className="px-4 py-2 lg:px-8">
                 <ModListItem mod={mod} warningStatus={warningStatuses[mod.id]} />
               </div>
             )}
@@ -451,34 +465,31 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
             overscan={20}
           />
         ) : (
-          // GRID VIEW - Virtualized with Virtuoso
-          <Virtuoso
-            ref={listRef}
-            data={gridRows}
-            className="min-h-0 flex-1"
-            style={{ height: '100%' }}
-            initialTopMostItemIndex={scrollIndex > 0 ? scrollIndex + 1 : 0}
-            itemContent={(index, row) => (
-              <ModGridRow mods={row} index={index} columns={gridColumns} warningStatuses={warningStatuses} />
+          <div
+            ref={gridScrollRef}
+            onScroll={handleGridScroll}
+            className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-8 pt-2 lg:px-8"
+            style={{ overscrollBehavior: 'contain' }}
+          >
+            <div className={`grid ${gridColsClass} gap-x-3 gap-y-4`}>
+              {mods.map((mod) => (
+                <ModCard key={mod.id} mod={mod} warningStatus={warningStatuses[mod.id]} />
+              ))}
+            </div>
+            <div ref={loadMoreSentinelRef} className="h-8 w-full" aria-hidden />
+            {isLoadingMore && (
+              <div className="py-4 text-center text-xs text-neutral-400">Loading more…</div>
             )}
-            rangeChanged={handleRangeChanged}
-            endReached={loadNextPage}
-            increaseViewportBy={{ top: 200, bottom: 1200 }}
-            atBottomThreshold={600}
-            overscan={12}
-          />
+            {!hasMore && mods.length > 0 && (
+              <div className="py-4 text-center text-xs text-neutral-500">End of results</div>
+            )}
+          </div>
         )
       ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center py-12 text-gray-500">
+        <div className="flex flex-1 items-center justify-center">
+          <div className="py-12 text-center text-gray-500">
             <p>{t('mods.list.no_results')}</p>
           </div>
-        </div>
-      )}
-
-      {isLoadingMore && (
-        <div className="flex-shrink-0 py-2 text-center text-xs text-neutral-400">
-          Loading more…
         </div>
       )}
     </div>

@@ -338,14 +338,14 @@ export function registerIpcHandlers() {
   // --- App Handlers ---
   ipcMain.handle('app:getVersion', async () => {
     // Prefer package.json version so title/splash always match the bumped build.
-    return app.getVersion() || '0.6.1';
+    return app.getVersion() || '0.6.2';
   });
 
   ipcMain.handle('app:getBuildInfo', async () => {
     return {
-      version: app.getVersion() || '0.6.1',
-      buildCode: 'S4MM-UI-2',
-      label: `v${app.getVersion() || '0.6.1'} (S4MM-UI-2)`,
+      version: app.getVersion() || '0.6.2',
+      buildCode: 'S4MM-UI-3',
+      label: `v${app.getVersion() || '0.6.2'} (S4MM-UI-3)`,
     };
   });
 

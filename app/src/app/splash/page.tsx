@@ -23,7 +23,7 @@ export default function SplashPage() {
     try {
       const build = await window.electron.ipcRenderer.invoke('app:getBuildInfo').catch(() => null);
       const appVersion = build?.label || (await window.electron.ipcRenderer.invoke('app:getVersion'));
-      setVersion(typeof appVersion === 'string' ? appVersion.replace(/^v/, '') : '0.6.1');
+      setVersion(typeof appVersion === 'string' ? appVersion.replace(/^v/, '') : '0.6.2');
 
       await sleep(1400);
       setStage('loading');
