@@ -91,8 +91,9 @@ export default function Home() {
    */
   async function updateWindowTitle() {
     try {
-      const version = await window.electron.ipcRenderer.invoke('app:getVersion');
-      await window.electron.ipcRenderer.invoke('window:setTitle', `CC Café v${version} - Mod Manager`);
+      const build = await window.electron.ipcRenderer.invoke('app:getBuildInfo');
+      const label = build?.label || `v${build?.version || '0.6.0'}`;
+      await window.electron.ipcRenderer.invoke('window:setTitle', `CC Café ${label} - Mod Manager`);
     } catch (error) {
       console.error('Failed to update window title:', error);
     }

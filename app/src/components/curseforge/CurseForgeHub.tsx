@@ -16,6 +16,7 @@ import { ViewMode } from '@/hooks/useViewMode';
 import { formatFileSize, formatRelativeDate } from '@/utils/formatters';
 import { getCompatStorageItem, setCompatStorageItem } from '@/lib/utils/storageCompat';
 import { BRANDING } from '@/lib/branding';
+import { BUILD_LABEL } from '@/lib/buildInfo';
 
 type HubTab = 'home' | 'favorites' | 'browse' | 'creators' | 'downloads' | 'updates';
 
@@ -427,7 +428,12 @@ export default function CurseForgeHub({
   return (
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
       <div className="px-8 pt-7 pb-4">
-        <h1 className="text-3xl font-bold text-white">CurseForge</h1>
+        <div className="flex items-end justify-between gap-4">
+          <h1 className="text-3xl font-bold text-white">CurseForge</h1>
+          <span className="pb-1 text-xs font-bold uppercase tracking-wide text-brand-green">
+            {BUILD_LABEL}
+          </span>
+        </div>
         <div className="mt-5 inline-flex rounded-full bg-white/5 p-2">
           {tabs.map((tab) => (
             <button

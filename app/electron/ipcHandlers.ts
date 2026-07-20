@@ -337,7 +337,16 @@ export function registerIpcHandlers() {
 
   // --- App Handlers ---
   ipcMain.handle('app:getVersion', async () => {
-    return app.getVersion();
+    // Prefer package.json version so title/splash always match the bumped build.
+    return app.getVersion() || '0.6.0';
+  });
+
+  ipcMain.handle('app:getBuildInfo', async () => {
+    return {
+      version: app.getVersion() || '0.6.0',
+      buildCode: 'S4MM-UI-1',
+      label: `v${app.getVersion() || '0.6.0'} (S4MM-UI-1)`,
+    };
   });
 
   ipcMain.handle('app:relaunch', async () => {

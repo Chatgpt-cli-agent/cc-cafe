@@ -21,8 +21,9 @@ export default function SplashPage() {
 
   const initializeSplash = useCallback(async () => {
     try {
-      const appVersion = await window.electron.ipcRenderer.invoke('app:getVersion');
-      setVersion(appVersion);
+      const build = await window.electron.ipcRenderer.invoke('app:getBuildInfo').catch(() => null);
+      const appVersion = build?.label || (await window.electron.ipcRenderer.invoke('app:getVersion'));
+      setVersion(typeof appVersion === 'string' ? appVersion.replace(/^v/, '') : '0.6.0');
 
       await sleep(1400);
       setStage('loading');
@@ -211,8 +212,8 @@ export default function SplashPage() {
                 {statusText}
               </p>
               {version && (
-                <p className="mt-3 text-sm" style={{ color: '#9a927d' }}>
-                  v{version}
+                <p className="mt-3 text-sm font-bold" style={{ color: '#5c8c43' }}>
+                  {version.startsWith('v') ? version : `v${version}`}
                 </p>
               )}
               {errorMessage && stage === 'starting' && (

@@ -1,10 +1,12 @@
 {
   "name": "cc-cafe-app",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "main": "dist-main/main.js",
   "scripts": {
-    "dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "predev": "tsc -p tsconfig.main.json && node scripts/copy-core.js",
+    "dev": "concurrently -k \"next dev -p 3000\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "prestart": "npm run build",
     "build": "next build && tsc -p tsconfig.main.json && node scripts/copy-core.js",
     "start": "cross-env NODE_ENV=production electron .",
     "lint": "eslint .",
