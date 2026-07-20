@@ -9,6 +9,7 @@ export const BRANDING = {
   },
   curseforge: {
     home: 'Counter',
+    favorites: 'Favorites',
     browse: 'Menu',
     creatorMenu: 'Creator Menu',
     orders: 'Orders',

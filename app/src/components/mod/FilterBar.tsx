@@ -238,7 +238,7 @@ export default function FilterBar({
   }, []);
 
   return (
-    <div className="px-8 py-4 flex flex-col md:flex-row md:items-center gap-4 border-b sticky top-0 z-10 backdrop-blur-md" style={{ backgroundColor: 'var(--ui-panel)', borderColor: 'var(--ui-border)' }}>
+    <div className="z-10 flex shrink-0 flex-col gap-4 border-b px-8 py-4 backdrop-blur-md md:flex-row md:items-center" style={{ backgroundColor: 'var(--ui-panel)', borderColor: 'var(--ui-border)' }}>
       {/* Dropdowns */}
       <div className="flex items-center gap-2" ref={dropdownRef}>
         {/* Category Dropdown */}

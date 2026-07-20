@@ -92,7 +92,7 @@ const StorageHelper = {
  * Get the CurseForge API key from local storage and decrypt it
  * @returns The decrypted API key or null if not configured
  */
-async function getCurseForgeApiKey(): Promise<string | null> {
+export async function getCurseForgeApiKey(): Promise<string | null> {
   const encryptedKey = StorageHelper.getLocal('cccafe_api_key');
   if (!encryptedKey) {
     return null;

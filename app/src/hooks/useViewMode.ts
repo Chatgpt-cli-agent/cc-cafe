@@ -16,7 +16,7 @@ export type ViewMode = 'list' | 'grid';
  * @returns Object with viewMode state, toggle function, and hydration flag
  */
 export function useViewMode() {
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [isLoaded, setIsLoaded] = useState(false);
 
   /**

@@ -4,6 +4,16 @@ import { curseForgeProxyService } from './services/curseforge/CurseForgeProxySer
 import { modVersionService } from './services/curseforge/ModVersionService';
 import { toolsService } from './services/tools/ToolsService';
 import { advancedToolsService } from './services/tools/AdvancedToolsService';
+import { fingerprintService } from './services/s4mm/FingerprintService';
+import { hqTexturesService } from './services/s4mm/HqTexturesService';
+import { mergeToolService } from './services/s4mm/MergeToolService';
+import { creatorToolsService } from './services/s4mm/CreatorToolsService';
+import { tgiCheckerService } from './services/s4mm/TgiCheckerService';
+import { regionMapService } from './services/s4mm/RegionMapService';
+import { saveFilesService } from './services/s4mm/SaveFilesService';
+import { archiveService } from './services/s4mm/ArchiveService';
+import { objectViewerService } from './services/s4mm/ObjectViewerService';
+import { packageInspectService } from './services/s4mm/PackageInspectService';
 import { z } from 'zod';
 import fs from 'fs/promises';
 import path from 'path';
@@ -327,7 +337,16 @@ export function registerIpcHandlers() {
 
   // --- App Handlers ---
   ipcMain.handle('app:getVersion', async () => {
-    return app.getVersion();
+    // Prefer package.json version so title/splash always match the bumped build.
+    return app.getVersion() || '0.6.2';
+  });
+
+  ipcMain.handle('app:getBuildInfo', async () => {
+    return {
+      version: app.getVersion() || '0.6.2',
+      buildCode: 'S4MM-UI-3',
+      label: `v${app.getVersion() || '0.6.2'} (S4MM-UI-3)`,
+    };
   });
 
   ipcMain.handle('app:relaunch', async () => {
@@ -511,6 +530,208 @@ export function registerIpcHandlers() {
   ipcMain.handle('curseforge-batch-versions', async (_event, { apiKey, modIds }) => {
     try {
       return await modVersionService.getLatestVersions(apiKey, modIds);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // --- S4MM 2.0 feature ports ---
+
+  /** Fingerprints: compute CurseForge fingerprints for local files */
+  ipcMain.handle('s4mm:fingerprint-scan', async (_event, { rootPath }) => {
+    try {
+      return await fingerprintService.scanFolder(rootPath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Fingerprints: match fingerprints against the CurseForge API */
+  ipcMain.handle('s4mm:fingerprint-match', async (_event, { apiKey, fingerprints }) => {
+    try {
+      return await fingerprintService.matchFingerprints(apiKey, fingerprints);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** HQ textures: scan for oversized LRLE/RLE2 textures */
+  ipcMain.handle('s4mm:hq-textures-scan', async (_event, { rootPath, types }) => {
+    try {
+      return await hqTexturesService.scan(rootPath, types);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Merge tool: find S4S merged packages */
+  ipcMain.handle('s4mm:merge-scan', async (_event, { rootPath }) => {
+    try {
+      return await mergeToolService.scanMergedPackages(rootPath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Merge tool: extract/unmerge/remove packages from a merged file */
+  ipcMain.handle('s4mm:merge-action', async (_event, { action, filePath, destination, packages }) => {
+    try {
+      if (action === 'extract') {
+        mergeToolService.extractPackages(filePath, destination, packages);
+      } else if (action === 'unmerge') {
+        mergeToolService.unmergePackages(filePath, destination, packages);
+      } else if (action === 'remove') {
+        mergeToolService.removePackages(filePath, packages);
+      } else if (action === 'unmerge-all') {
+        mergeToolService.unmergeAll(filePath, destination);
+      } else {
+        throw new Error(`Unknown merge action: ${action}`);
+      }
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Creators: build a loading screen package from an image */
+  ipcMain.handle('s4mm:create-loading-screen', async (_event, { outputPath, imagePath, options }) => {
+    try {
+      return await creatorToolsService.createLoadingScreen(outputPath, imagePath, options);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Creators: build a main menu override package from an image */
+  ipcMain.handle('s4mm:create-main-menu', async (_event, { outputPath, imagePath }) => {
+    try {
+      return await creatorToolsService.createMainMenu(outputPath, imagePath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Creators: find existing loading screen / main menu packages */
+  ipcMain.handle('s4mm:creator-scan', async (_event, { rootPath }) => {
+    try {
+      return await creatorToolsService.scanCreatorPackages(rootPath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Creators: randomize which loading screen is active */
+  ipcMain.handle('s4mm:creator-randomize', async (_event, { filePaths }) => {
+    try {
+      return creatorToolsService.randomize(filePaths);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** TGI checker: find CAS parts with unresolved TGI references */
+  ipcMain.handle('s4mm:tgi-check', async (_event, { rootPath, threshold }) => {
+    try {
+      return await tgiCheckerService.check(rootPath, threshold);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Region map: find packages containing region maps */
+  ipcMain.handle('s4mm:rmap-scan', async (_event, { rootPath }) => {
+    try {
+      return await regionMapService.findFilesWithRegionMaps(rootPath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Region map: check mesh bounds against region expectations */
+  ipcMain.handle('s4mm:rmap-process', async (_event, { files, types, options }) => {
+    try {
+      return regionMapService.processFiles(files, types, options);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Save files: list saves with decoded slot names */
+  ipcMain.handle('s4mm:saves-list', async (_event, { savesPath }) => {
+    try {
+      return saveFilesService.listSaves(savesPath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Save files: decode a save file summary */
+  ipcMain.handle('s4mm:saves-read', async (_event, { filePath }) => {
+    try {
+      return saveFilesService.readSaveSummary(filePath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Archives: list ZIP/RAR contents */
+  ipcMain.handle('s4mm:archive-list', async (_event, { archivePath }) => {
+    try {
+      return await archiveService.listContents(archivePath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Archives: extract a full ZIP/RAR archive */
+  ipcMain.handle('s4mm:archive-extract-all', async (_event, { archivePath, outputDir }) => {
+    try {
+      return await archiveService.extractAll(archivePath, outputDir);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Object viewer: CAS/COBJ items and swatches in a package */
+  ipcMain.handle('s4mm:objectviewer-items', async (_event, { filePath }) => {
+    try {
+      return objectViewerService.getCasItems(filePath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Object viewer: GEOM mesh data for rendering */
+  ipcMain.handle('s4mm:objectviewer-models', async (_event, { filePath, addresses }) => {
+    try {
+      return objectViewerService.getModels(filePath, addresses);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Object viewer: decode a texture resource to PNG */
+  ipcMain.handle('s4mm:objectviewer-texture', async (_event, { filePath, address }) => {
+    try {
+      return await objectViewerService.extractTexture(filePath, address);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Package inspect: S4MM-style package classification */
+  ipcMain.handle('s4mm:inspect-package', async (_event, { filePath }) => {
+    try {
+      return await packageInspectService.inspectFile(filePath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Package inspect: classify every package in a folder */
+  ipcMain.handle('s4mm:inspect-scan', async (_event, { rootPath }) => {
+    try {
+      return await packageInspectService.scanFolder(rootPath);
     } catch (error: any) {
       return { success: false, error: error.message };
     }

@@ -9,6 +9,7 @@ import ProfileSelector from '@/components/profile/ProfileSelector';
 import UpdateCountBadge from '@/components/update/UpdateCountBadge';
 import { useTranslation } from 'react-i18next';
 import { BRANDING } from '@/lib/branding';
+import { BUILD_LABEL } from '@/lib/buildInfo';
 
 interface SidebarProps {
   onThemeToggle: () => void;
@@ -53,9 +54,14 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
                 <path d="M12 2L3 11L12 22L21 11L12 2Z" />
               </svg>
             </div>
-            <div className="flex items-end gap-1 font-black tracking-tight">
-              <span className="text-[28px] leading-none text-white">CC</span>
-              <span className="text-[28px] leading-none text-brand-green">CAFÉ</span>
+            <div>
+              <div className="flex items-end gap-1 font-black tracking-tight">
+                <span className="text-[28px] leading-none text-white">CC</span>
+                <span className="text-[28px] leading-none text-brand-green">CAFÉ</span>
+              </div>
+              <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-green">
+                {BUILD_LABEL}
+              </div>
             </div>
           </div>
           <div className="w-8 h-8 text-brand-green flex-shrink-0 flex items-center justify-center lg:hidden">
