@@ -41,12 +41,33 @@ export default function ModsIndexPanel({ onClose }: { onClose?: () => void }) {
   }
 
   useEffect(() => {
-    void refreshStatus();
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const next = await s4mmToolsService.getModsIndexStatus();
+        if (!cancelled) setStatus(next);
+      } catch (error: any) {
+        if (!cancelled) {
+          showToast({
+            type: 'error',
+            title: 'Could not load index status',
+            message: error?.message || 'Unable to read the mods file index.',
+            duration: 3000,
+          });
+        }
+      }
+    })();
+
     const unsubscribe = s4mmToolsService.onModsIndexProgress((event) => {
       setProgress(event);
     });
-    return unsubscribe;
-  }, []);
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [showToast]);
 
   async function runRebuild(full: boolean) {
     const modsPath = await filesystemToolsService.getModsPath();
@@ -151,12 +172,9 @@ export default function ModsIndexPanel({ onClose }: { onClose?: () => void }) {
       )}
 
       {!status ? (
-        <S4mmEmptyState>Loading index status…</S4mmEmptyState>
+        <S4mmEmptyState message="Loading index status…" />
       ) : status.fileCount === 0 ? (
-        <S4mmEmptyState>
-          No index yet. Run Sync index once to catalog your Mods folder. Fingerprint, merge, TGI, HQ texture, and
-          region map tools will use it automatically afterward.
-        </S4mmEmptyState>
+        <S4mmEmptyState message="No index yet. Run Sync index once to catalog your Mods folder. Fingerprint, merge, TGI, HQ texture, and region map tools will use it automatically afterward." />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Stat label="Files indexed" value={String(status.fileCount)} />
