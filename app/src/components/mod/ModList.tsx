@@ -76,17 +76,18 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
   } | null>(null);
 
   /**
-   * Calculate number of grid columns based on viewport width
+   * Dense S4MM-style column count based on available content width.
    */
   useEffect(() => {
     const updateGridColumns = () => {
       const width = window.innerWidth;
-      // xs/sm: 1, sm/md: 2, md/lg: 3, lg/xl: 4, xl/2xl: 5
-      if (width < 640) setGridColumns(1);
-      else if (width < 1024) setGridColumns(2);
-      else if (width < 1280) setGridColumns(3);
-      else if (width < 1536) setGridColumns(4);
-      else setGridColumns(5);
+      if (width < 700) setGridColumns(3);
+      else if (width < 900) setGridColumns(5);
+      else if (width < 1100) setGridColumns(7);
+      else if (width < 1300) setGridColumns(8);
+      else if (width < 1500) setGridColumns(9);
+      else if (width < 1700) setGridColumns(10);
+      else setGridColumns(11);
     };
 
     updateGridColumns();

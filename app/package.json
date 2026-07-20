@@ -5,8 +5,8 @@
   "main": "dist-main/main.js",
   "scripts": {
     "dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "build": "next build && tsc -p tsconfig.main.json && powershell -Command \"Copy-Item electron/core/*.js dist-main/core/ -Force\"",
-    "start": "powershell -Command \"$env:NODE_ENV='production'; electron .\"",
+    "build": "next build && tsc -p tsconfig.main.json && node scripts/copy-core.js",
+    "start": "cross-env NODE_ENV=production electron .",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -56,6 +56,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "autoprefixer": "^10.5.0",
     "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
     "electron": "^42.1.0",
     "electron-builder": "^26.8.1",
     "eslint": "^9.39.4",
