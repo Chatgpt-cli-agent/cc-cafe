@@ -17,7 +17,9 @@ import { formatFileSize, formatRelativeDate } from '@/utils/formatters';
 import { getCompatStorageItem, setCompatStorageItem } from '@/lib/utils/storageCompat';
 import { BRANDING } from '@/lib/branding';
 
-type HubTab = 'home' | 'browse' | 'creators' | 'downloads' | 'updates';
+type HubTab = 'home' | 'favorites' | 'browse' | 'creators' | 'downloads' | 'updates';
+
+const HUB_TABS: HubTab[] = ['home', 'favorites', 'browse', 'creators', 'downloads', 'updates'];
 type SortOption = 'downloads' | 'date' | 'trending' | 'relevance';
 type FilterChip = 'all' | 'updates' | 'early-access' | 'installed';
 
@@ -198,7 +200,7 @@ export default function CurseForgeHub({
       const tab = params.get('tab') as HubTab | null;
       const creatorId = Number(params.get('creatorId'));
       const creatorName = params.get('creatorName');
-      setActiveTab(tab && ['home', 'browse', 'creators', 'downloads', 'updates'].includes(tab) ? tab : 'home');
+      setActiveTab(tab && HUB_TABS.includes(tab) ? tab : 'home');
       setSelectedCreator(
         Number.isInteger(creatorId) && creatorId > 0 && creatorName
           ? { id: creatorId, name: creatorName }
@@ -415,6 +417,7 @@ export default function CurseForgeHub({
 
   const tabs: Array<{ id: HubTab; label: string }> = [
     { id: 'home', label: BRANDING.curseforge.home },
+    { id: 'favorites', label: BRANDING.curseforge.favorites },
     { id: 'browse', label: BRANDING.curseforge.browse },
     { id: 'creators', label: BRANDING.curseforge.creatorMenu },
     { id: 'downloads', label: BRANDING.curseforge.orders },
@@ -473,28 +476,47 @@ export default function CurseForgeHub({
             <div className="py-12 flex justify-center text-neutral-400"><Spinner className="animate-spin" size={32} /></div>
           ) : (
             <>
-          {followedCreators.length > 0 && (
-                <section className="mt-8">
-                  <h2 className="text-xl font-bold text-white">{BRANDING.curseforge.favoritesMenu}</h2>
-                  <div className="mt-3 flex gap-3 flex-wrap">
-                    {followedCreators.map((creator) => (
-                      <button
-                        type="button"
-                        key={creator.id}
-                        onClick={() => pushCreatorRoute(creator)}
-                        className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10 cursor-pointer"
-                      >
-                        <div className="text-sm text-neutral-400">{BRANDING.curseforge.baristas}</div>
-                        <div className="font-bold text-white">{creator.name}</div>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              )}
               <Section title="Fresh Picks" mods={popularMods} />
               <Section title={BRANDING.curseforge.recentUpdates} mods={recentMods} />
             </>
           )}
+        </div>
+      )}
+
+      {activeTab === 'favorites' && (
+        <div className="flex-1 overflow-y-auto px-8 pb-12">
+          <section className="mt-4">
+            <h2 className="text-xl font-bold text-white">{BRANDING.curseforge.favoritesMenu}</h2>
+            <p className="mt-1 text-sm text-neutral-400">
+              Creators you have favorited. Open one to browse their mods or manage favorites from Creator Menu.
+            </p>
+            {followedCreators.length === 0 ? (
+              <div className="mt-8 rounded-lg border border-white/10 bg-white/5 px-6 py-10 text-center text-neutral-400">
+                No favorited creators yet. Favorite a barista from Creator Menu to pin them here.
+              </div>
+            ) : (
+              <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                {followedCreators.map((creator) => (
+                  <button
+                    type="button"
+                    key={creator.id}
+                    onClick={() => pushCreatorRoute(creator)}
+                    className="rounded-lg border border-white/10 bg-white/5 px-4 py-4 text-left transition-colors hover:bg-white/10 cursor-pointer"
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-neutral-700 text-lg font-bold text-white">
+                      {creator.name.slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="mt-3 text-xs uppercase tracking-wide text-neutral-400">
+                      {BRANDING.curseforge.baristas}
+                    </div>
+                    <div className="mt-1 truncate font-bold text-white" title={creator.name}>
+                      {creator.name}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       )}
 

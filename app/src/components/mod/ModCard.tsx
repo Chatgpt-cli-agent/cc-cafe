@@ -1,7 +1,7 @@
 /**
  * Mod Card Component for Grid View
  *
- * Vertical card displaying mod with image, title, and installation
+ * S4MM-style dense tile: square thumbnail, title, author, installed badge.
  */
 
 'use client';
@@ -9,21 +9,18 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { DownloadSimple, Spinner, Check } from '@phosphor-icons/react';
+import { Check, DownloadSimple, Spinner } from '@phosphor-icons/react';
 import { CurseForgeMod } from '@/types/curseforge';
 import { useToast } from '@/context/ToastContext';
 import { useProfiles } from '@/context/ProfileContext';
 import { modInstallationService } from '@/lib/services/ModInstallationService';
 import { userPreferencesService } from '@/lib/services/UserPreferencesService';
 import { getCompatStorageItem } from '@/lib/utils/storageCompat';
-import { formatDownloadCount } from '@/utils/formatters';
-import { useDateFormatters } from '@/hooks/useDateFormatters';
 import { fakeScoreService } from '@/lib/services/FakeScoreService';
 import { submitFakeModReport } from '@/lib/fakeDetectionApi';
 import WarningBadge from './WarningBadge';
 import FakeModWarningPopup from './FakeModWarningPopup';
 import { useTranslation } from 'react-i18next';
-import { useCategoryLocalization } from '@/utils/categoryTranslation';
 import type { ModWarningStatus, FakeScoreResult, ZipAnalysis } from '@/types/fakeDetection';
 
 interface ModCardProps {
@@ -33,41 +30,31 @@ interface ModCardProps {
 }
 
 /**
- * Card component for grid view
- * Displays mod with prominent image, title, summary, and install button
+ * Dense S4MM-style grid tile.
+ * Primary click opens the mod detail; install is available via the hover action.
  */
 export default function ModCard({ mod, warningStatus }: ModCardProps) {
   const { t } = useTranslation();
-  const { formatRelativeDate } = useDateFormatters();
-  const localizeCategory = useCategoryLocalization();
-  const authorNames = mod.authors.map((a) => a.name).join(', ');
-  const categoryNames = mod.categories.slice(0, 2).map(cat => localizeCategory(cat));
   const { showToast, updateToast } = useToast();
   const { refreshProfiles, activeProfile } = useProfiles();
   const [isInstalling, setIsInstalling] = useState(false);
-
-  // Fake mod detection popup state
   const [showFakeWarning, setShowFakeWarning] = useState(false);
   const [fakeScoreResult, setFakeScoreResult] = useState<FakeScoreResult | null>(null);
   const [pendingInstallResolve, setPendingInstallResolve] = useState<((decision: 'install' | 'cancel' | 'report') => void) | null>(null);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
-  // Check if mod is already installed in the active profile
   const isInstalled = activeProfile?.mods.some((m) => m.modId === mod.id) ?? false;
+  const primaryAuthor = mod.authors[0];
 
-  /**
-   * Handle mod installation from card
-   */
   const handleInstall = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (isInstalling) return;
+    if (isInstalling || isInstalled || warningStatus?.creatorBanned) return;
 
     try {
       setIsInstalling(true);
 
-      // Get modsPath from localStorage
       const StorageHelper = {
         decryptData: async (encryptedData: string, password: string = 'cccafe-settings'): Promise<string | null> => {
           try {
@@ -82,18 +69,13 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
             }
             const iv = combined.slice(0, 12);
             const encrypted = combined.slice(12);
-            const decrypted = await crypto.subtle.decrypt(
-              { name: 'AES-GCM', iv: iv },
-              key,
-              encrypted
-            );
-            const decoder = new TextDecoder();
-            return decoder.decode(decrypted);
+            const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted);
+            return new TextDecoder().decode(decrypted);
           } catch (error) {
             console.error('Decryption failed:', error);
             return null;
           }
-        }
+        },
       };
 
       const encryptedModsPath = getCompatStorageItem('cccafe_mods_path');
@@ -104,7 +86,6 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
           message: t('mods.toasts.configure_in_settings'),
           duration: 3000,
         });
-        setIsInstalling(false);
         return;
       }
 
@@ -116,25 +97,19 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
           message: t('mods.toasts.reconfigure_in_settings'),
           duration: 3000,
         });
-        setIsInstalling(false);
         return;
       }
 
-      // Show initial toast
       const toastId = showToast({
         type: 'download',
         title: t('mods.toasts.installing', { modName: mod.name }),
         message: t('mods.toasts.starting_download'),
         progress: 0,
-        duration: 0, // Don't auto-dismiss during download
+        duration: 0,
       });
 
-      // Fake detection callback - shows popup and waits for user decision
       const onFakeDetection = userPreferencesService.getFakeModDetection()
-        ? async (
-            scoreResult: FakeScoreResult,
-            _zipAnalysis: ZipAnalysis
-          ): Promise<'install' | 'cancel' | 'report'> => {
+        ? async (scoreResult: FakeScoreResult, _zipAnalysis: ZipAnalysis): Promise<'install' | 'cancel' | 'report'> => {
             return new Promise((resolve) => {
               setFakeScoreResult(scoreResult);
               setPendingInstallResolve(() => resolve);
@@ -143,7 +118,6 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
           }
         : undefined;
 
-      // Start installation with fake detection (if enabled)
       const result = await modInstallationService.installMod(
         mod.id,
         modsPath,
@@ -154,11 +128,10 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
             progress: progress.percent,
           });
         },
-        undefined, // fileId
+        undefined,
         onFakeDetection
       );
 
-      // Show result
       if (result.success) {
         updateToast(toastId, {
           type: 'success',
@@ -166,7 +139,6 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
           message: t('mods.toasts.installed_successfully', { modName: result.modName }),
           duration: 3000,
         });
-        // Refresh profiles to update the library
         await refreshProfiles();
       } else {
         updateToast(toastId, {
@@ -188,9 +160,6 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
     }
   };
 
-  /**
-   * Handle "Install Anyway" from fake warning popup
-   */
   const handleInstallAnyway = () => {
     setShowFakeWarning(false);
     pendingInstallResolve?.('install');
@@ -198,9 +167,6 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
     setFakeScoreResult(null);
   };
 
-  /**
-   * Handle "Report and Cancel" from fake warning popup
-   */
   const handleReportAndCancel = async (reason: string) => {
     setIsSubmittingReport(true);
     try {
@@ -243,9 +209,6 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
     }
   };
 
-  /**
-   * Handle popup close without action
-   */
   const handleClosePopup = () => {
     setShowFakeWarning(false);
     pendingInstallResolve?.('cancel');
@@ -253,143 +216,84 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
     setFakeScoreResult(null);
   };
 
+  const openCreator = (e: React.MouseEvent, author: { id: number; name: string }) => {
+    e.preventDefault();
+    e.stopPropagation();
+    window.history.pushState(
+      null,
+      '',
+      `/?tab=creators&creatorId=${author.id}&creatorName=${encodeURIComponent(author.name)}`
+    );
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
   return (
     <>
-      <Link href={`/mods?id=${mod.id}`}>
-        <div
-          className="group rounded-lg overflow-hidden transition-all duration-200 h-full flex flex-col"
-          style={{
-            backgroundColor: 'var(--ui-panel)',
-            border: '1px solid var(--ui-border)',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--ui-hover)')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--ui-panel)')}
-        >
-
-          {/* Image Section */}
-          <div className="relative aspect-video overflow-hidden" style={{ backgroundColor: '#1a1a1a' }}>
-            {mod.logo ? (
-              <Image
-                src={mod.logo}
-                alt={mod.name}
-                fill
-                className="object-cover group-hover:scale-105 transition-transform duration-200"
-                unoptimized
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-4xl" style={{ color: 'var(--text-tertiary)' }}>
-                📦
-              </div>
-            )}
-
-            {/* Hover overlay */}
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200" />
-
-            {/* Warning Badge */}
-            {warningStatus && (warningStatus.hasWarning || warningStatus.creatorBanned) && (
-              <div className="absolute top-2 right-2 z-10">
-                <WarningBadge status={warningStatus} size="sm" />
-              </div>
-            )}
-          </div>
-
-          {/* Content Section */}
-          <div className="p-4 flex-1 flex flex-col gap-3">
-
-            {/* Title and Author */}
-            <div className="h-14">
-              <h3 className="text-sm font-semibold line-clamp-2" style={{ color: 'var(--text-primary)' }}>
-                {mod.name}
-              </h3>
-              <p className="text-xs line-clamp-1" style={{ color: 'var(--text-secondary)' }}>
-                {t('mods.card.by')}{' '}
-                {mod.authors.length > 0 ? (
-                  mod.authors.map((author, index) => (
-                    <span key={author.id}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          window.history.pushState(null, '', `/?tab=creators&creatorId=${author.id}&creatorName=${encodeURIComponent(author.name)}`);
-                          window.dispatchEvent(new PopStateEvent('popstate'));
-                        }}
-                        className="underline hover:text-brand-green cursor-pointer"
-                      >
-                        {author.name}
-                      </button>
-                      {index < mod.authors.length - 1 ? ', ' : ''}
-                    </span>
-                  ))
-                ) : (
-                  t('mods.card.unknown_author')
-                )}
-              </p>
+      <Link href={`/mods?id=${mod.id}`} className="group block min-w-0">
+        <div className="relative aspect-square overflow-hidden rounded-sm bg-neutral-900">
+          {mod.logo ? (
+            <Image
+              src={mod.logo}
+              alt={mod.name}
+              fill
+              className="object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-3xl" style={{ color: 'var(--text-tertiary)' }}>
+              ?
             </div>
+          )}
 
-            {/* Summary */}
-            {mod.summary && (
-              <p className="text-xs line-clamp-2 overflow-hidden min-h-8" style={{ color: 'var(--text-secondary)' }}>
-                {mod.summary}
-              </p>
-            )}
-
-            {/* Categories */}
-            {categoryNames.length > 0 && (
-              <div className="flex gap-1 flex-wrap overflow-hidden h-7">
-                {categoryNames.map((cat, i) => (
-                  <span
-                    key={i}
-                    className="text-xs px-2 py-1 rounded truncate flex-shrink-0"
-                    style={{
-                      backgroundColor: 'var(--ui-hover)',
-                      color: 'var(--text-secondary)',
-                    }}
-                    title={cat}
-                  >
-                    {cat}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Stats */}
-            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              <span>{formatDownloadCount(mod.downloadCount)}</span>
-              <span>•</span>
-              <span>{formatRelativeDate(mod.dateModified)}</span>
-            </div>
-
-            {/* Install Button */}
-            <button
-              onClick={handleInstall}
-              disabled={isInstalling || isInstalled || warningStatus?.creatorBanned}
-              className={`w-full px-3 py-2.5 font-medium rounded text-sm transition-colors disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 ${
-                isInstalled
-                  ? 'bg-gray-500 text-white'
-                  : 'bg-brand-green hover:bg-brand-dark text-white disabled:opacity-50'
-              }`}
-              title={isInstalled ? t('mods.card.already_installed') : isInstalling ? t('mods.card.installing') : t('mods.card.install')}
+          {isInstalled && (
+            <div
+              className="absolute left-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-brand-green text-black shadow"
+              title={t('mods.card.already_installed')}
             >
-              {isInstalled ? (
-                <>
-                  <Check size={18} weight="bold" />
-                  <span>{t('mods.card.installed')}</span>
-                </>
-              ) : isInstalling ? (
-                <Spinner size={18} className="animate-spin" />
-              ) : (
-                <>
-                  <DownloadSimple size={18} />
-                  <span>{t('mods.card.install')}</span>
-                </>
-              )}
+              <Check size={12} weight="bold" />
+            </div>
+          )}
+
+          {warningStatus && (warningStatus.hasWarning || warningStatus.creatorBanned) && (
+            <div className="absolute right-1.5 top-1.5 z-10">
+              <WarningBadge status={warningStatus} size="sm" />
+            </div>
+          )}
+
+          {!isInstalled && !warningStatus?.creatorBanned && (
+            <button
+              type="button"
+              onClick={handleInstall}
+              disabled={isInstalling}
+              className="absolute bottom-1.5 right-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-brand-green text-black opacity-0 shadow transition-opacity group-hover:opacity-100 disabled:cursor-not-allowed cursor-pointer"
+              title={isInstalling ? t('mods.card.installing') : t('mods.card.install')}
+            >
+              {isInstalling ? <Spinner size={14} className="animate-spin" /> : <DownloadSimple size={14} weight="bold" />}
             </button>
-          </div>
+          )}
+        </div>
+
+        <div className="mt-1.5 min-w-0">
+          <h3 className="truncate text-[13px] font-semibold leading-tight text-white" title={mod.name}>
+            {mod.name}
+          </h3>
+          <p className="mt-0.5 truncate text-xs text-neutral-400">
+            {t('mods.card.by')}{' '}
+            {primaryAuthor ? (
+              <button
+                type="button"
+                onClick={(e) => openCreator(e, primaryAuthor)}
+                className="underline hover:text-brand-green cursor-pointer"
+              >
+                {primaryAuthor.name}
+              </button>
+            ) : (
+              t('mods.card.unknown_author')
+            )}
+          </p>
         </div>
       </Link>
 
-      {/* Fake Mod Warning Popup - Outside Link */}
       {fakeScoreResult && (
         <FakeModWarningPopup
           isOpen={showFakeWarning}
@@ -404,4 +308,3 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
     </>
   );
 }
-
