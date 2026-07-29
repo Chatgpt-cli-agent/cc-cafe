@@ -110,8 +110,8 @@
       "no_mod_files": "Файлы модов не найдены в архиве"
     },
     "remove_modal": {
-      "title": "Удалить мод",
-      "message": "Вы уверены, что хотите удалить «{{modName}}» из профиля? Это действие нельзя отменить.",
+      "title": "Удалить мод из приложения",
+      "message": "Удалить «{{modName}}» из этого профиля? Управляемые файлы будут удалены из папки Mods. Общий кэш сохранится, если мод используется другим профилем.",
       "confirm": "Удалить"
     }
   },
@@ -202,6 +202,16 @@
       "backup": {
         "title": "Резервное копирование перед обновлением",
         "description": "Создавать копию перезаписанных файлов в папке /Backups."
+      },
+      "install_layout": {
+        "title": "Download layout",
+        "description": "Choose where installed CC files are placed inside your Mods folder.",
+        "options": {
+          "mods_folder": "Mods folder",
+          "creator_folder": "Creator folder",
+          "creator_cc_folder": "Creator / item",
+          "cc_folder": "CC folder"
+        }
       },
       "fake_detection": {
         "title": "Обнаружение фейковых модов",

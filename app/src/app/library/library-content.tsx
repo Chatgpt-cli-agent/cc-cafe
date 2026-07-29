@@ -635,7 +635,7 @@ export default function LibraryContent() {
                         )}
                       </button>
 
-                      {/* Remove Button */}
+                      {/* Uninstall Button */}
                       <button
                         onClick={(e) => {
                           e.preventDefault();
@@ -643,7 +643,7 @@ export default function LibraryContent() {
                           handleRemoveModClick(mod.modId || mod.localModId!, mod.modName, mod.localModId);
                         }}
                         disabled={isLoading}
-                        className="p-2 rounded transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-2 rounded transition-colors text-sm font-medium"
                         title={t('library.mod_item.remove_tooltip')}
                         style={{
                           color: '#ef4444',
@@ -658,6 +658,7 @@ export default function LibraryContent() {
                         }}
                       >
                         <Trash size={20} />
+                        <span>{t('library.remove_modal.confirm')}</span>
                       </button>
                     </div>
                   </div>

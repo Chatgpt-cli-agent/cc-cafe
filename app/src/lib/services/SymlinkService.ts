@@ -6,8 +6,8 @@
  * Uses parallel operations with auto-detected concurrency for optimal performance.
  */
 
-import { SymlinkResult, SymlinkError } from '@/types/profile';
-import { sanitizeModName } from '@/utils/pathSanitizer';
+import type { CachedModFile, InstallLayoutMode, SymlinkResult, SymlinkError } from '@/types/profile';
+import { sanitizeDisplayFolderName, sanitizeModName } from '@/utils/pathSanitizer';
 import { diskPerformanceService } from './DiskPerformanceService';
 import {
   concurrentMap,
@@ -18,6 +18,32 @@ import {
 interface SymlinkPath {
   source: string;
   modName: string;
+  creatorName?: string;
+  installLayoutMode?: InstallLayoutMode;
+  files?: CachedModFile[];
+}
+
+interface ManagedPathEntry {
+  path: string;
+  type: 'file' | 'dir';
+}
+
+interface ManagedFilesManifest {
+  version: 1;
+  entries: ManagedPathEntry[];
+}
+
+const MANAGED_FILES_MANIFEST = '.cccafe-managed-files.json';
+const ARCHIVE_METADATA_ENTRIES = new Set(['__MACOSX', '.DS_Store']);
+
+export function getSingleArchiveWrapperName(
+  entries: Array<{ name: string; isDirectory: boolean }>
+): string | null {
+  const meaningfulEntries = entries.filter((entry) => !ARCHIVE_METADATA_ENTRIES.has(entry.name));
+  if (meaningfulEntries.length !== 1 || !meaningfulEntries[0].isDirectory) {
+    return null;
+  }
+  return meaningfulEntries[0].name;
 }
 
 export class SymlinkService {
@@ -46,13 +72,19 @@ export class SymlinkService {
 
     const results = await concurrentMap(
       cachePaths,
-      async ({ source, modName }) => {
-        const sanitizedName = sanitizeModName(modName);
-        const targetPath = await window.electron.ipcRenderer.invoke('path:join', modsPath, sanitizedName);
+      async (item) => {
+        const { source, modName } = item;
+        const targetPath = await this.resolveTargetPath(modsPath, item);
+        const copySource = await this.resolveCopySource(source, item);
 
-        await window.electron.ipcRenderer.invoke('fs:copyDir', source, targetPath);
+        await window.electron.ipcRenderer.invoke('fs:copyDir', copySource, targetPath);
 
-        return { source, modName, targetPath };
+        return {
+          source,
+          modName,
+          targetPath,
+          managedEntries: await this.getManagedEntriesForItem(targetPath, item),
+        };
       },
       poolSize
     );
@@ -64,13 +96,20 @@ export class SymlinkService {
     created = successful.length;
     failed = failedResults.length;
 
+    if (successful.length > 0) {
+      await this.writeManagedFilesManifest(
+        modsPath,
+        successful.flatMap((result) => result.managedEntries)
+      );
+    }
+
     // Build error list from failed operations
     for (const { index, error } of failedResults) {
       const { source, modName } = cachePaths[index];
-      const sanitizedName = sanitizeModName(modName);
+      const targetPath = await this.resolveTargetPath(modsPath, cachePaths[index]);
       errors.push({
         sourcePath: source,
-        targetPath: await window.electron.ipcRenderer.invoke('path:join', modsPath, sanitizedName),
+        targetPath,
         error: String(error),
       });
     }
@@ -93,6 +132,37 @@ export class SymlinkService {
     let failed = 0;
 
     try {
+      const managedManifest = await this.readManagedFilesManifest(modsPath);
+      if (managedManifest) {
+        const entries = [...managedManifest.entries].sort((a, b) => b.path.length - a.path.length);
+
+        for (const entry of entries) {
+          try {
+            if (await window.electron.ipcRenderer.invoke('fs:exists', entry.path)) {
+              await window.electron.ipcRenderer.invoke('fs:remove', entry.path, {
+                recursive: entry.type === 'dir',
+              });
+              created++;
+            }
+          } catch (error) {
+            failed++;
+            errors.push({
+              sourcePath: '',
+              targetPath: entry.path,
+              error: String(error),
+            });
+          }
+        }
+
+        await this.removeManagedFilesManifest(modsPath);
+        return {
+          success: failed === 0,
+          created,
+          failed,
+          errors,
+        };
+      }
+
       // List all entries in mods directory
       const entries = await window.electron.ipcRenderer.invoke('fs:readDir', modsPath);
 
@@ -182,6 +252,119 @@ export class SymlinkService {
     } catch (error) {
       console.error('Failed to list mod directories:', error);
       return [];
+    }
+  }
+
+  private async resolveTargetPath(modsPath: string, item: SymlinkPath): Promise<string> {
+    switch (item.installLayoutMode || 'creator-cc-folder') {
+      case 'mods-folder':
+        return modsPath;
+      case 'creator-folder': {
+        const folderName = sanitizeModName(item.creatorName || item.modName);
+        return await window.electron.ipcRenderer.invoke('path:join', modsPath, folderName);
+      }
+      case 'creator-cc-folder': {
+        const creatorFolder = sanitizeDisplayFolderName(item.creatorName || '', 'Unknown Creator');
+        const itemFolder = sanitizeDisplayFolderName(item.modName, 'Unnamed Item');
+        return await window.electron.ipcRenderer.invoke(
+          'path:join',
+          modsPath,
+          creatorFolder,
+          itemFolder
+        );
+      }
+      case 'cc-folder':
+      default: {
+        const folderName = sanitizeModName(item.modName);
+        return await window.electron.ipcRenderer.invoke('path:join', modsPath, folderName);
+      }
+    }
+  }
+
+  private async resolveCopySource(source: string, item: SymlinkPath): Promise<string> {
+    const layoutMode = item.installLayoutMode || 'creator-cc-folder';
+    if (layoutMode !== 'creator-cc-folder' && layoutMode !== 'cc-folder') {
+      return source;
+    }
+
+    const entries = await window.electron.ipcRenderer.invoke('fs:readDir', source);
+    const wrapperName = getSingleArchiveWrapperName(entries);
+    if (!wrapperName) {
+      return source;
+    }
+
+    return await window.electron.ipcRenderer.invoke('path:join', source, wrapperName);
+  }
+
+  private async getManagedEntriesForItem(
+    targetPath: string,
+    item: SymlinkPath
+  ): Promise<ManagedPathEntry[]> {
+    const layoutMode = item.installLayoutMode || 'creator-cc-folder';
+    if (layoutMode === 'cc-folder' || layoutMode === 'creator-cc-folder') {
+      return [{ path: targetPath, type: 'dir' }];
+    }
+
+    if (!item.files || item.files.length === 0) {
+      return [];
+    }
+
+    return await Promise.all(
+      item.files.map(async (file) => ({
+        path: await this.joinRelativePath(targetPath, file.relativePath || file.fileName),
+        type: 'file' as const,
+      }))
+    );
+  }
+
+  private async joinRelativePath(basePath: string, relativePath: string): Promise<string> {
+    const parts = relativePath.split(/[\\/]+/).filter(Boolean);
+    return await window.electron.ipcRenderer.invoke('path:join', basePath, ...parts);
+  }
+
+  private async getManagedFilesManifestPath(modsPath: string): Promise<string> {
+    return await window.electron.ipcRenderer.invoke('path:join', modsPath, MANAGED_FILES_MANIFEST);
+  }
+
+  private async readManagedFilesManifest(modsPath: string): Promise<ManagedFilesManifest | null> {
+    const manifestPath = await this.getManagedFilesManifestPath(modsPath);
+    if (!(await window.electron.ipcRenderer.invoke('fs:exists', manifestPath))) {
+      return null;
+    }
+
+    try {
+      const content = await window.electron.ipcRenderer.invoke('fs:readTextFile', manifestPath);
+      const parsed = JSON.parse(content) as ManagedFilesManifest;
+      if (!Array.isArray(parsed.entries)) {
+        return null;
+      }
+      return parsed;
+    } catch (error) {
+      console.warn('Failed to read CC Cafe managed files manifest:', error);
+      return null;
+    }
+  }
+
+  private async writeManagedFilesManifest(
+    modsPath: string,
+    entries: ManagedPathEntry[]
+  ): Promise<void> {
+    const manifestPath = await this.getManagedFilesManifestPath(modsPath);
+    const uniqueEntries = Array.from(
+      new Map(entries.map((entry) => [entry.path, entry])).values()
+    );
+
+    await window.electron.ipcRenderer.invoke(
+      'fs:writeFile',
+      manifestPath,
+      JSON.stringify({ version: 1, entries: uniqueEntries }, null, 2)
+    );
+  }
+
+  private async removeManagedFilesManifest(modsPath: string): Promise<void> {
+    const manifestPath = await this.getManagedFilesManifestPath(modsPath);
+    if (await window.electron.ipcRenderer.invoke('fs:exists', manifestPath)) {
+      await window.electron.ipcRenderer.invoke('fs:remove', manifestPath);
     }
   }
 

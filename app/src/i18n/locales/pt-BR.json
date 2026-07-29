@@ -110,9 +110,9 @@
       "no_mod_files": "Nenhum arquivo de mod encontrado no arquivo"
     },
     "remove_modal": {
-      "title": "Remover Mod",
-      "message": "Tem certeza que deseja remover «{{modName}}» do seu perfil? Esta ação não pode ser desfeita.",
-      "confirm": "Remover"
+      "title": "Desinstalar Mod",
+      "message": "Desinstalar «{{modName}}» deste perfil? Os arquivos gerenciados serão removidos da pasta Mods. O cache compartilhado será mantido se outro perfil ainda o utilizar.",
+      "confirm": "Desinstalar"
     }
   },
   "profiles": {
@@ -202,6 +202,16 @@
       "backup": {
         "title": "Backup antes de atualizar",
         "description": "Crie uma cópia dos arquivos sobrescritos na pasta /Backups."
+      },
+      "install_layout": {
+        "title": "Download layout",
+        "description": "Choose where installed CC files are placed inside your Mods folder.",
+        "options": {
+          "mods_folder": "Mods folder",
+          "creator_folder": "Creator folder",
+          "creator_cc_folder": "Creator / item",
+          "cc_folder": "CC folder"
+        }
       },
       "fake_detection": {
         "title": "Detecção de mods falsos",

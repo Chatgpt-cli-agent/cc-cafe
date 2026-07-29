@@ -135,6 +135,25 @@ export class ModCacheService {
     return await window.electron.ipcRenderer.invoke('path:join', this.cacheDir!, fileHash, 'files');
   }
 
+  /** Release one profile's reference and delete the cache entry when unused. */
+  async releaseCachedMod(fileHash: string, profileId: string): Promise<void> {
+    await this.ensureInitialized();
+    const index = await this.getIndex();
+    const entry = index.entries[fileHash];
+    if (!entry) {
+      return;
+    }
+
+    entry.usedByProfiles = entry.usedByProfiles.filter((id) => id !== profileId);
+    if (entry.usedByProfiles.length === 0) {
+      await this.deleteCacheEntry(fileHash);
+      delete index.entries[fileHash];
+    } else {
+      index.entries[fileHash] = entry;
+    }
+    await this.saveIndex(index);
+  }
+
   /**
    * Remove profile from cache usage tracking
    */

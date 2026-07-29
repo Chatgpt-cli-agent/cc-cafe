@@ -11,6 +11,7 @@ import { ModProfile, ProfileMod } from '@/types/profile';
 import { profileService } from '@/lib/services/ProfileService';
 import { modCacheService } from '@/lib/services/ModCacheService';
 import { symlinkService } from '@/lib/services/SymlinkService';
+import { userPreferencesService } from '@/lib/services/UserPreferencesService';
 import { sims4PathDetector } from '@/lib/services/Sims4PathDetector';
 import { useToast } from './ToastContext';
 import i18n from '@/i18n';
@@ -228,11 +229,19 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           const enabledMods = profile.mods.filter((mod) => mod.enabled);
 
           // Build symlink list from cache
+          const installLayoutMode = userPreferencesService.getInstallLayoutMode();
           const cachePaths = await Promise.all(
-            enabledMods.map(async (mod) => ({
-              source: await modCacheService.getCachePath(mod.fileHash),
-              modName: mod.modName,
-            }))
+            enabledMods.map(async (mod) => {
+              const cachedMod = await modCacheService.getCachedMod(mod.fileHash);
+
+              return {
+                source: await modCacheService.getCachePath(mod.fileHash),
+                modName: mod.modName,
+                creatorName: mod.authors?.[0],
+                installLayoutMode,
+                files: cachedMod?.files,
+              };
+            })
           );
 
           // Create symlinks
@@ -293,6 +302,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const removeModFromProfile = useCallback(
     async (profileId: string, modId: number | string, localModId?: string) => {
       try {
+        const profile = await profileService.getProfile(profileId);
+        const removedMod = profile?.mods.find((mod) =>
+          localModId ? mod.localModId === localModId : mod.modId === modId
+        );
         await profileService.removeModFromProfile(profileId, modId, localModId);
 
         // If removing a mod from the active profile, re-activate it
@@ -301,6 +314,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           await activateProfile(profileId);
         } else {
           await refreshProfiles();
+        }
+
+        if (removedMod?.fileHash) {
+          await modCacheService.releaseCachedMod(removedMod.fileHash, profileId);
         }
 
         showToast({

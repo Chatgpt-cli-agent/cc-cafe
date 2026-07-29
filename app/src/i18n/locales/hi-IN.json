@@ -110,9 +110,9 @@
       "no_mod_files": "संग्रह में कोई मॉड फ़ाइलें नहीं मिलीं"
     },
     "remove_modal": {
-      "title": "मॉड हटाएँ",
-      "message": "क्या आप वाकई \"{{modName}}\" को अपनी प्रोफ़ाइल से हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।",
-      "confirm": "हटाएँ"
+      "title": "मॉड अनइंस्टॉल करें",
+      "message": "क्या इस प्रोफ़ाइल से \"{{modName}}\" को अनइंस्टॉल करना है? इसकी प्रबंधित फ़ाइलें Mods फ़ोल्डर से हटा दी जाएँगी। यदि कोई अन्य प्रोफ़ाइल इसका उपयोग करती है तो साझा कैश रखा जाएगा।",
+      "confirm": "अनइंस्टॉल करें"
     }
   },
   "profiles": {
@@ -202,6 +202,16 @@
       "backup": {
         "title": "अपडेट से पहले बैकअप",
         "description": "/Backups फ़ोल्डर में ओवरराइट किए गए फ़ाइलों की प्रतिलिपि बनाएँ।"
+      },
+      "install_layout": {
+        "title": "Download layout",
+        "description": "Choose where installed CC files are placed inside your Mods folder.",
+        "options": {
+          "mods_folder": "Mods folder",
+          "creator_folder": "Creator folder",
+          "creator_cc_folder": "Creator / item",
+          "cc_folder": "CC folder"
+        }
       },
       "fake_detection": {
         "title": "नकली मॉड पहचान",
