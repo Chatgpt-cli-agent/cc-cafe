@@ -113,6 +113,15 @@
       "title": "Uninstall Mod",
       "message": "Uninstall \"{{modName}}\" from this profile? Its managed files will be removed from your Mods folder. Shared cache data is kept if another profile still uses it.",
       "confirm": "Uninstall"
+    },
+    "bulk": {
+      "select_all": "Select All",
+      "clear_filtered": "Unselect Filtered",
+      "clear": "Clear",
+      "uninstall_selected": "Uninstall Selected ({{count}})",
+      "select_item": "Select {{modName}}",
+      "modal_title": "Uninstall Selected Mods",
+      "modal_message": "Uninstall {{count}} selected mods from this profile? Their managed files will be removed from your Mods folder."
     }
   },
   "profiles": {
@@ -647,6 +656,8 @@
       "failed_to_create_symlinks": "Failed to create {{count}} symlinks:\n{{errors}}\n\nCheck permissions and that The Sims 4 is not running.",
       "mod_removed": "Mod removed",
       "mod_removed_from_profile": "Mod removed from profile",
+      "mods_uninstalled": "Mods uninstalled",
+      "mods_uninstalled_count": "{{count}} mods were uninstalled from the profile",
       "failed_to_remove_mod": "Failed to remove mod"
     },
     "update": {

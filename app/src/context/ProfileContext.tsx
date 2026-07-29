@@ -32,6 +32,10 @@ export interface ProfileContextType {
   activateProfile: (profileId: string | null) => Promise<void>;
   addModToProfile: (profileId: string, mod: ProfileMod) => Promise<void>;
   removeModFromProfile: (profileId: string, modId: number | string, localModId?: string) => Promise<void>;
+  uninstallModsFromProfile: (
+    profileId: string,
+    mods: Array<{ modId?: number | string; localModId?: string }>
+  ) => Promise<void>;
   toggleModInProfile: (profileId: string, modId: number | string, enabled: boolean, localModId?: string) => Promise<void>;
   getModsPath: () => string | null;
 }
@@ -339,6 +343,60 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     [refreshProfiles, showToast, activeProfile, activateProfile]
   );
 
+  const uninstallModsFromProfile = useCallback(
+    async (
+      profileId: string,
+      mods: Array<{ modId?: number | string; localModId?: string }>
+    ) => {
+      if (mods.length === 0) return;
+
+      try {
+        const profile = await profileService.getProfile(profileId);
+        if (!profile) {
+          throw new Error(i18n.t('contexts.profile.profile_not_found'));
+        }
+
+        const matches = (mod: ProfileMod) => mods.some((selected) =>
+          selected.localModId
+            ? mod.localModId === selected.localModId
+            : selected.modId !== undefined && mod.modId === selected.modId
+        );
+        const removedMods = profile.mods.filter(matches);
+        await profileService.updateProfile(profileId, {
+          mods: profile.mods.filter((mod) => !matches(mod)),
+        });
+
+        if (activeProfile?.id === profileId) {
+          await activateProfile(profileId);
+        } else {
+          await refreshProfiles();
+        }
+
+        for (const mod of removedMods) {
+          if (mod.fileHash) {
+            await modCacheService.releaseCachedMod(mod.fileHash, profileId);
+          }
+        }
+
+        showToast({
+          type: 'success',
+          title: i18n.t('contexts.profile.mods_uninstalled'),
+          message: i18n.t('contexts.profile.mods_uninstalled_count', { count: removedMods.length }),
+          duration: 3000,
+        });
+      } catch (error: any) {
+        showToast({
+          type: 'error',
+          title: i18n.t('contexts.profile.failed_to_remove_mod'),
+          message: error.message || i18n.t('contexts.profile.unknown_error'),
+          duration: 5000,
+        });
+        throw error;
+      }
+    },
+    [activeProfile, activateProfile, refreshProfiles, showToast]
+  );
+
   /**
    * Toggle a mod enabled/disabled in a profile
    */
@@ -381,6 +439,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     activateProfile,
     addModToProfile,
     removeModFromProfile,
+    uninstallModsFromProfile,
     toggleModInProfile,
     getModsPath,
   };

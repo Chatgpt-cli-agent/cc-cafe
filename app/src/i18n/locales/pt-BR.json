@@ -113,6 +113,15 @@
       "title": "Desinstalar Mod",
       "message": "Desinstalar «{{modName}}» deste perfil? Os arquivos gerenciados serão removidos da pasta Mods. O cache compartilhado será mantido se outro perfil ainda o utilizar.",
       "confirm": "Desinstalar"
+    },
+    "bulk": {
+      "select_all": "Selecionar tudo",
+      "clear_filtered": "Desmarcar filtrados",
+      "clear": "Limpar",
+      "uninstall_selected": "Desinstalar selecionados ({{count}})",
+      "select_item": "Selecionar {{modName}}",
+      "modal_title": "Desinstalar mods selecionados",
+      "modal_message": "Desinstalar {{count}} mods selecionados deste perfil? Os arquivos gerenciados serão removidos da pasta Mods."
     }
   },
   "profiles": {
@@ -647,6 +656,8 @@
       "failed_to_create_symlinks": "Falha ao criar {{count}} links simbólicos:\n{{errors}}\n\nVerifique as permissões e se o The Sims 4 não está em execução.",
       "mod_removed": "Mod removido",
       "mod_removed_from_profile": "Mod removido do perfil",
+      "mods_uninstalled": "Mods desinstalados",
+      "mods_uninstalled_count": "{{count}} mods foram desinstalados do perfil",
       "failed_to_remove_mod": "Falha ao remover mod"
     },
     "update": {

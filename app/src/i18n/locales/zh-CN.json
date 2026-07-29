@@ -113,6 +113,15 @@
       "title": "卸载模组",
       "message": "要从此配置文件卸载「{{modName}}」吗？其托管文件将从 Mods 文件夹中删除。如果其他配置文件仍在使用，共享缓存将被保留。",
       "confirm": "卸载"
+    },
+    "bulk": {
+      "select_all": "全选",
+      "clear_filtered": "取消选择筛选项",
+      "clear": "清除选择",
+      "uninstall_selected": "卸载所选项（{{count}}）",
+      "select_item": "选择 {{modName}}",
+      "modal_title": "卸载所选模组",
+      "modal_message": "要从此配置文件卸载所选的 {{count}} 个模组吗？其托管文件将从 Mods 文件夹中删除。"
     }
   },
   "profiles": {
@@ -647,6 +656,8 @@
       "failed_to_create_symlinks": "创建 {{count}} 个符号链接失败：\n{{errors}}\n\n请检查权限并确保 The Sims 4 未在运行。",
       "mod_removed": "模组已移除",
       "mod_removed_from_profile": "模组已从配置文件中移除",
+      "mods_uninstalled": "模组已卸载",
+      "mods_uninstalled_count": "已从配置文件卸载 {{count}} 个模组",
       "failed_to_remove_mod": "移除模组失败"
     },
     "update": {
