@@ -1,9 +1,9 @@
 name: Refresh App Lockfile
 
 on:
-  push:
+  pull_request:
     branches:
-      - feature/create-studio-foundation
+      - main
     paths:
       - 'app/package.json'
       - 'app/package-lock.json'
