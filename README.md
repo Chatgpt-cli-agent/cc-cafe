@@ -9,6 +9,21 @@ CC Café is an open-source Sims 4 mod manager built as a monolithic Electron + N
 - Fake mod detection and reporting
 - S4MM-style tools for duplicate scans, CC package analysis, ID conflict checks, polygon scans, empty folder cleanup, and pack disable commands
 - Sims Log Enabler installation and game log viewing
+- Create Studio foundation for persistent AI-assisted Sims 4 CC production projects
+
+## Create Studio Foundation
+
+Create Studio is the beginning of a structured AI production workspace for Sims 4 custom content. The current foundation focuses on safe, static Build/Buy décor and provides:
+
+- A project wizard for prompts, object categories, swatch counts, notes, and reference images
+- Per-project workspaces stored in CC Café application data rather than the Sims 4 Mods folder
+- Project manifests and folders for references, briefs, concepts, models, textures, Sims output, previews, reports, and logs
+- An eight-stage production pipeline covering creative direction, concept art, 3D generation, Blender processing, texturing, Sims packaging, QA, and publishing
+- Persistent stage status, progress, failure state, and approval gates
+- A working Creative Director stage that writes an asset brief for creator approval
+- Browser-preview persistence through local storage when Electron APIs are unavailable
+
+The model-generation, Blender automation, texturing, and Sims package workers are intentionally represented as explicit later integrations. The foundation does not yet claim to produce a finished `.package` file.
 
 ## Repository Layout
 
@@ -76,5 +91,4 @@ npm run release
 
 ## Notes
 
-- The top-level `updates/` folder is kept for release artifacts and manifest output.
-
+- The top-level `updates/` folder is kept for release artifacts and manifest output placeholder.

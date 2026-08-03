@@ -4,7 +4,14 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useProfiles } from '@/context/ProfileContext';
 import { useUpdates } from '@/context/UpdateContext';
-import { MagnifyingGlass, DownloadSimple, UserList, GearSix, Toolbox } from '@phosphor-icons/react';
+import {
+  MagnifyingGlass,
+  DownloadSimple,
+  UserList,
+  GearSix,
+  Toolbox,
+  Sparkle,
+} from '@phosphor-icons/react';
 import ProfileSelector from '@/components/profile/ProfileSelector';
 import UpdateCountBadge from '@/components/update/UpdateCountBadge';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +33,7 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
   const getActiveNav = () => {
     if (pathname === '/' || pathname?.startsWith('/mods')) return 'browse';
     if (pathname === '/library') return 'library';
+    if (pathname?.startsWith('/studio')) return 'studio';
     if (pathname === '/tools') return 'tools';
     if (pathname === '/profiles') return 'profiles';
     return null;
@@ -97,9 +105,26 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
         <nav className="space-y-1">
           {[
             { id: 'browse', label: BRANDING.sidebar.browse, icon: MagnifyingGlass, href: '/' },
-            { id: 'library', label: BRANDING.sidebar.pantry, icon: DownloadSimple, href: '/library', badge: updateCount },
+            {
+              id: 'library',
+              label: BRANDING.sidebar.pantry,
+              icon: DownloadSimple,
+              href: '/library',
+              badge: updateCount,
+            },
+            {
+              id: 'studio',
+              label: BRANDING.sidebar.studio,
+              icon: Sparkle,
+              href: '/studio',
+            },
             { id: 'tools', label: 'Tools', icon: Toolbox, href: '/tools' },
-            { id: 'profiles', label: BRANDING.sidebar.profiles, icon: UserList, href: '/profiles' },
+            {
+              id: 'profiles',
+              label: BRANDING.sidebar.profiles,
+              icon: UserList,
+              href: '/profiles',
+            },
           ].map(({ id, label, icon: Icon, href, badge }) => {
             const isActive = getActiveNav() === id && !href.includes('filter=updates');
             return (
@@ -113,22 +138,20 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
                   fontWeight: isActive ? '500' : 'normal',
                   boxShadow: isActive ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={(event) => {
                   if (!isActive) {
-                    e.currentTarget.style.backgroundColor = 'var(--ui-hover)';
+                    event.currentTarget.style.backgroundColor = 'var(--ui-hover)';
                   }
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={(event) => {
                   if (!isActive) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
+                    event.currentTarget.style.backgroundColor = 'transparent';
                   }
                 }}
               >
                 <Icon size={20} />
                 <span className="hidden lg:block flex-1 text-left">{label}</span>
-                {badge !== undefined && badge > 0 && (
-                  <UpdateCountBadge count={badge} />
-                )}
+                {badge !== undefined && badge > 0 && <UpdateCountBadge count={badge} />}
               </button>
             );
           })}
@@ -148,11 +171,11 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
           style={{
             color: 'var(--text-secondary)',
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = '#46C89B';
+          onMouseEnter={(event) => {
+            event.currentTarget.style.color = '#46C89B';
           }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'var(--text-secondary)';
+          onMouseLeave={(event) => {
+            event.currentTarget.style.color = 'var(--text-secondary)';
           }}
           aria-label={t('layout.sidebar.settings')}
           title={BRANDING.sidebar.settings}

@@ -4,6 +4,7 @@ export const BRANDING = {
     home: 'Counter',
     browse: 'Menu',
     pantry: 'Pantry',
+    studio: 'Create Studio',
     profiles: 'Profiles',
     settings: 'Settings',
   },
