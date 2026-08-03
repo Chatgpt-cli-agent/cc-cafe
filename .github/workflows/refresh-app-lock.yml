@@ -10,15 +10,18 @@ on:
       - '.github/workflows/refresh-app-lock.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   refresh:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: windows-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout feature branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -30,6 +33,21 @@ jobs:
       - name: Refresh package lock
         working-directory: ./app
         run: npm install --package-lock-only --ignore-scripts
+
+      - name: Commit refreshed lockfile
+        shell: pwsh
+        run: |
+          $changes = git status --porcelain app/package-lock.json
+          if (-not $changes) {
+            Write-Host 'The package lock is already current.'
+            exit 0
+          }
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/package-lock.json
+          git commit -m 'chore: refresh app package lock'
+          git push origin "HEAD:${{ github.head_ref }}"
 
       - name: Upload refreshed lockfile
         uses: actions/upload-artifact@v4
