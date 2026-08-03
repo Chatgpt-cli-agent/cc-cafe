@@ -80,6 +80,7 @@ describe('studio stage transitions', () => {
       now: new Date('2026-08-03T12:02:00.000Z'),
     });
     expect(project.status).toBe('needs-approval');
+    expect(project.stages[0].startedAt).toBe('2026-08-03T12:01:00.000Z');
     expect(getActionableStudioStage(project)?.id).toBe('creative-direction');
   });
 
