@@ -20,6 +20,8 @@ import { ImportProgressModal } from './components/ImportProgressModal';
 import { localModImportService } from '@/lib/services/LocalModImportService';
 import type { ImportSummary } from '@/lib/services/LocalModImportService';
 import { BRANDING } from '@/lib/branding';
+import type { ProfileMod } from '@/types/profile';
+import { getModSelectionKey } from '@/lib/utils/modSelection';
 
 /**
  * Library content component that handles displaying and managing mods
@@ -27,8 +29,14 @@ import { BRANDING } from '@/lib/branding';
 export default function LibraryContent() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
-  const { activeProfile, isLoading, toggleModInProfile, removeModFromProfile, refreshProfiles } =
-    useProfiles();
+  const {
+    activeProfile,
+    isLoading,
+    toggleModInProfile,
+    removeModFromProfile,
+    uninstallModsFromProfile,
+    refreshProfiles,
+  } = useProfiles();
   const { hasUpdate, updateMod, updateAllMods, updateCount, isUpdating, isChecking, checkForUpdates } = useUpdates();
 
   /** Filter options for the library */
@@ -57,13 +65,16 @@ export default function LibraryContent() {
     modId: number | string | null;
     localModId?: string;
     modName: string;
+    bulkCount: number;
     isLoading: boolean;
   }>({
     isOpen: false,
     modId: null,
     modName: '',
+    bulkCount: 0,
     isLoading: false,
   });
+  const [selectedModKeys, setSelectedModKeys] = useState<Set<string>>(new Set());
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({
     currentFile: '',
@@ -156,6 +167,46 @@ export default function LibraryContent() {
     return mods;
   }, [activeProfile, searchTerm, filterStatus, sortBy, hasUpdate]);
 
+  useEffect(() => {
+    const available = new Set(activeProfile?.mods.map(getModSelectionKey) || []);
+    setSelectedModKeys((current) => new Set([...current].filter((key) => available.has(key))));
+  }, [activeProfile]);
+
+  const allFilteredSelected = filteredMods.length > 0
+    && filteredMods.every((mod) => selectedModKeys.has(getModSelectionKey(mod)));
+
+  const toggleSelectedMod = (mod: ProfileMod) => {
+    const key = getModSelectionKey(mod);
+    setSelectedModKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleSelectAllFiltered = () => {
+    setSelectedModKeys((current) => {
+      const next = new Set(current);
+      for (const mod of filteredMods) {
+        const key = getModSelectionKey(mod);
+        if (allFilteredSelected) next.delete(key);
+        else next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const handleBulkUninstallClick = () => {
+    setConfirmationModal({
+      isOpen: true,
+      modId: null,
+      modName: '',
+      bulkCount: selectedModKeys.size,
+      isLoading: false,
+    });
+  };
+
   const handleToggleMod = async (modId: number | string, enabled: boolean, localModId?: string) => {
     try {
       if (activeProfile) {
@@ -172,24 +223,39 @@ export default function LibraryContent() {
       modId,
       localModId,
       modName,
+      bulkCount: 0,
       isLoading: false,
     });
   };
 
   const handleRemoveModConfirm = async () => {
-    if (!confirmationModal.modId || !activeProfile) return;
+    if (!activeProfile) return;
 
     try {
       setConfirmationModal((prev) => ({ ...prev, isLoading: true }));
-      await removeModFromProfile(
-        activeProfile.id,
-        confirmationModal.modId,
-        confirmationModal.localModId
-      );
+      if (confirmationModal.bulkCount > 0) {
+        const selectedMods = activeProfile.mods.filter((mod) =>
+          selectedModKeys.has(getModSelectionKey(mod))
+        );
+        await uninstallModsFromProfile(
+          activeProfile.id,
+          selectedMods.map((mod) => ({ modId: mod.modId, localModId: mod.localModId }))
+        );
+        setSelectedModKeys(new Set());
+      } else if (confirmationModal.modId) {
+        await removeModFromProfile(
+          activeProfile.id,
+          confirmationModal.modId,
+          confirmationModal.localModId
+        );
+      } else {
+        return;
+      }
       setConfirmationModal({
         isOpen: false,
         modId: null,
         modName: '',
+        bulkCount: 0,
         isLoading: false,
       });
     } catch (error) {
@@ -340,6 +406,33 @@ export default function LibraryContent() {
 
           {/* Filter & Sort Dropdowns */}
           <div className="flex items-center gap-2" ref={dropdownRef}>
+            <button
+              onClick={toggleSelectAllFiltered}
+              disabled={filteredMods.length === 0}
+              className="flex items-center gap-2 px-3 h-10 border rounded-lg text-sm font-medium transition-colors"
+              style={{ backgroundColor: 'var(--ui-panel)', borderColor: 'var(--border-color)' }}
+            >
+              {allFilteredSelected ? t('library.bulk.clear_filtered') : t('library.bulk.select_all')}
+            </button>
+            {selectedModKeys.size > 0 && (
+              <>
+                <button
+                  onClick={() => setSelectedModKeys(new Set())}
+                  className="px-3 h-10 border rounded-lg text-sm font-medium"
+                  style={{ backgroundColor: 'var(--ui-panel)', borderColor: 'var(--border-color)' }}
+                >
+                  {t('library.bulk.clear')}
+                </button>
+                <button
+                  onClick={handleBulkUninstallClick}
+                  className="flex items-center gap-2 px-3 h-10 rounded-lg text-sm font-semibold"
+                  style={{ backgroundColor: '#dc2626', color: '#fff' }}
+                >
+                  <Trash size={17} />
+                  {t('library.bulk.uninstall_selected', { count: selectedModKeys.size })}
+                </button>
+              </>
+            )}
             {/* Filter Dropdown */}
             <div className="relative">
               <button
@@ -521,6 +614,18 @@ export default function LibraryContent() {
                       e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
+                    <input
+                      type="checkbox"
+                      checked={selectedModKeys.has(getModSelectionKey(mod))}
+                      aria-label={t('library.bulk.select_item', { modName: mod.modName })}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        toggleSelectedMod(mod);
+                      }}
+                      onChange={() => undefined}
+                      className="h-5 w-5 shrink-0 accent-emerald-500"
+                    />
                     {/* Mod Image */}
                     <div className="relative h-16 w-16 rounded-md overflow-hidden flex-shrink-0" style={{ backgroundColor: '#1a1a1a' }}>
                       {mod.isLocal ? (
@@ -635,7 +740,7 @@ export default function LibraryContent() {
                         )}
                       </button>
 
-                      {/* Remove Button */}
+                      {/* Uninstall Button */}
                       <button
                         onClick={(e) => {
                           e.preventDefault();
@@ -643,7 +748,7 @@ export default function LibraryContent() {
                           handleRemoveModClick(mod.modId || mod.localModId!, mod.modName, mod.localModId);
                         }}
                         disabled={isLoading}
-                        className="p-2 rounded transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-2 rounded transition-colors text-sm font-medium"
                         title={t('library.mod_item.remove_tooltip')}
                         style={{
                           color: '#ef4444',
@@ -658,6 +763,7 @@ export default function LibraryContent() {
                         }}
                       >
                         <Trash size={20} />
+                        <span>{t('library.remove_modal.confirm')}</span>
                       </button>
                     </div>
                   </div>
@@ -676,12 +782,17 @@ export default function LibraryContent() {
             isOpen: false,
             modId: null,
             modName: '',
+            bulkCount: 0,
             isLoading: false,
           })
         }
         onConfirm={handleRemoveModConfirm}
-        title={t('library.remove_modal.title')}
-        message={t('library.remove_modal.message', { modName: confirmationModal.modName })}
+        title={confirmationModal.bulkCount > 0
+          ? t('library.bulk.modal_title')
+          : t('library.remove_modal.title')}
+        message={confirmationModal.bulkCount > 0
+          ? t('library.bulk.modal_message', { count: confirmationModal.bulkCount })
+          : t('library.remove_modal.message', { modName: confirmationModal.modName })}
         confirmText={t('library.remove_modal.confirm')}
         cancelText={t('common.cancel')}
         isDangerous={true}

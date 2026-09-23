@@ -110,9 +110,18 @@
       "no_mod_files": "No mod files found in archive"
     },
     "remove_modal": {
-      "title": "Remove Mod",
-      "message": "Are you sure you want to remove \"{{modName}}\" from your profile? This action cannot be undone.",
-      "confirm": "Remove"
+      "title": "Uninstall Mod",
+      "message": "Uninstall \"{{modName}}\" from this profile? Its managed files will be removed from your Mods folder. Shared cache data is kept if another profile still uses it.",
+      "confirm": "Uninstall"
+    },
+    "bulk": {
+      "select_all": "Select All",
+      "clear_filtered": "Unselect Filtered",
+      "clear": "Clear",
+      "uninstall_selected": "Uninstall Selected ({{count}})",
+      "select_item": "Select {{modName}}",
+      "modal_title": "Uninstall Selected Mods",
+      "modal_message": "Uninstall {{count}} selected mods from this profile? Their managed files will be removed from your Mods folder."
     }
   },
   "profiles": {
@@ -177,6 +186,13 @@
       "mods_not_found": "Mods folder not found",
       "game_path_updated": "Game path updated",
       "mods_path_updated": "Mods path updated",
+      "inzoi_folder": "inZOI folder",
+      "inzoi_folder_placeholder": "Documents/inZOI",
+      "inzoi_folder_hint": "The Documents/inZOI folder. CC Café scans Mods, Canvas, Creations, and My 3D Printer inside it. Leave this empty to use that usual folder.",
+      "paralives_folder": "Paralives mods folder",
+      "paralives_folder_placeholder": "Paralives mods folder",
+      "paralives_folder_hint": "The folder that contains Paralives .mod folders. Leave this empty to use the usual Paralives folders.",
+      "content_path_updated": "Content folder updated",
       "failed_to_save": "Failed to save path"
     },
     "api_keys": {
@@ -202,6 +218,32 @@
       "backup": {
         "title": "Backup before updating",
         "description": "Create a copy of overwritten files in the /Backups folder."
+      },
+      "install_layout": {
+        "title": "Download layout",
+        "description": "Choose how CC Cafe organizes downloaded mods in its library.",
+        "options": {
+          "mods_folder": "Mods folder",
+          "creator_folder": "Creator folder",
+          "creator_cc_folder": "Creator / item",
+          "cc_folder": "CC folder",
+          "game_mirror": "Game mirror"
+        }
+      },
+      "library_root": {
+        "title": "Library folder",
+        "description": "Stores downloaded content in CC Cafe Library under your Documents folder by default. Use the folder picker to choose another location.",
+        "detected": "Library folder found",
+        "not_found": "Library folder not found"
+      },
+      "deploy_to_game": {
+        "title": "Deploy library to game",
+        "description": "Copy CC, Tray, and Gameplay Mods from the library into your game folders without overwriting existing files.",
+        "button": "Deploy to game",
+        "running": "Deploying...",
+        "success": "Deployed {{copied}} file(s). {{conflicts}} existing file(s) were left unchanged.",
+        "failed": "Deploy failed",
+        "missing_paths": "Configure both the library folder and mods folder before deploying."
       },
       "fake_detection": {
         "title": "Fake mod detection",
@@ -633,10 +675,13 @@
       "failed_to_activate": "Failed to activate profile",
       "still_initializing": "Profile system is still initializing. Please wait a moment and try again.",
       "mods_path_not_configured": "Mods path not configured. Could not find The Sims 4 installation.",
+      "library_path_not_configured": "Library folder not configured. Set it in Settings before activating a profile in game-mirror mode.",
       "profile_not_found": "Profile not found",
       "failed_to_create_symlinks": "Failed to create {{count}} symlinks:\n{{errors}}\n\nCheck permissions and that The Sims 4 is not running.",
       "mod_removed": "Mod removed",
       "mod_removed_from_profile": "Mod removed from profile",
+      "mods_uninstalled": "Mods uninstalled",
+      "mods_uninstalled_count": "{{count}} mods were uninstalled from the profile",
       "failed_to_remove_mod": "Failed to remove mod"
     },
     "update": {

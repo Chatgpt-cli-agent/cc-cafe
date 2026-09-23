@@ -11,6 +11,11 @@ import { ModProfile, ProfileMod } from '@/types/profile';
 import { profileService } from '@/lib/services/ProfileService';
 import { modCacheService } from '@/lib/services/ModCacheService';
 import { symlinkService } from '@/lib/services/SymlinkService';
+import { userPreferencesService } from '@/lib/services/UserPreferencesService';
+import {
+  installCachedModToLibrary,
+  removeModFromLibraryIfNeeded,
+} from '@/lib/services/LibraryInstallService';
 import { sims4PathDetector } from '@/lib/services/Sims4PathDetector';
 import { useToast } from './ToastContext';
 import i18n from '@/i18n';
@@ -31,6 +36,10 @@ export interface ProfileContextType {
   activateProfile: (profileId: string | null) => Promise<void>;
   addModToProfile: (profileId: string, mod: ProfileMod) => Promise<void>;
   removeModFromProfile: (profileId: string, modId: number | string, localModId?: string) => Promise<void>;
+  uninstallModsFromProfile: (
+    profileId: string,
+    mods: Array<{ modId?: number | string; localModId?: string }>
+  ) => Promise<void>;
   toggleModInProfile: (profileId: string, modId: number | string, enabled: boolean, localModId?: string) => Promise<void>;
   getModsPath: () => string | null;
 }
@@ -72,6 +81,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       // Initialize services
       await profileService.initialize();
       await modCacheService.initialize();
+      await userPreferencesService.initialize();
 
       // Try to detect Sims 4 mods path
       const paths = await sims4PathDetector.detectPaths();
@@ -208,36 +218,57 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           throw new Error(i18n.t('contexts.profile.still_initializing'));
         }
 
-        if (!modsPath) {
+        await userPreferencesService.initialize();
+        const installLayoutMode = userPreferencesService.getInstallLayoutMode();
+        const libraryRoot = userPreferencesService.getLibraryRoot();
+        const useGameMirror = installLayoutMode === 'game-mirror';
+        const activationRoot = useGameMirror ? libraryRoot : modsPath;
+
+        if (useGameMirror) {
+          if (!libraryRoot) {
+            throw new Error(i18n.t('contexts.profile.library_path_not_configured'));
+          }
+        } else if (!modsPath) {
           throw new Error(i18n.t('contexts.profile.mods_path_not_configured'));
         }
 
-        // Deactivate current profile (remove all symlinks)
-        if (activeProfile) {
-          await symlinkService.deactivateProfile(modsPath);
+        // Deactivate current profile (remove managed files)
+        if (activeProfile && activationRoot) {
+          await symlinkService.deactivateProfile(activationRoot);
         }
 
-        // Activate new profile (create symlinks)
+        // Activate new profile
         if (profileId) {
           const profile = await profileService.getProfile(profileId);
           if (!profile) {
             throw new Error(i18n.t('contexts.profile.profile_not_found'));
           }
 
-          // Only include enabled mods
-          const enabledMods = profile.mods.filter((mod) => mod.enabled);
-
-          // Build symlink list from cache
-          const cachePaths = await Promise.all(
-            enabledMods.map(async (mod) => ({
-              source: await modCacheService.getCachePath(mod.fileHash),
-              modName: mod.modName,
-            }))
+          // Only include enabled mods (save files never get symlinked)
+          const enabledMods = profile.mods.filter(
+            (mod) => mod.enabled && mod.contentKind !== 'save'
           );
 
-          // Create symlinks
+          // Build install list from cache
+          const cachePaths = await Promise.all(
+            enabledMods.map(async (mod) => {
+              const cachedMod = await modCacheService.getCachedMod(mod.fileHash);
+
+              return {
+                source: await modCacheService.getCachePath(mod.fileHash),
+                modName: mod.modName,
+                creatorName: mod.authors?.[0],
+                installLayoutMode,
+                files: cachedMod?.files,
+                modId: mod.modId,
+                localModId: mod.localModId,
+                fileHash: mod.fileHash,
+              };
+            })
+          );
+
           const result = await symlinkService.activateProfile(
-            modsPath,
+            activationRoot!,
             cachePaths
           );
 
@@ -293,14 +324,28 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const removeModFromProfile = useCallback(
     async (profileId: string, modId: number | string, localModId?: string) => {
       try {
+        const profile = await profileService.getProfile(profileId);
+        const removedMod = profile?.mods.find((mod) =>
+          localModId ? mod.localModId === localModId : mod.modId === modId
+        );
         await profileService.removeModFromProfile(profileId, modId, localModId);
 
-        // If removing a mod from the active profile, re-activate it
-        // to sync the file system immediately
+        const useGameMirror =
+          userPreferencesService.getInstallLayoutMode() === 'game-mirror';
+
         if (activeProfile?.id === profileId) {
-          await activateProfile(profileId);
+          if (useGameMirror && removedMod) {
+            await removeModFromLibraryIfNeeded(removedMod);
+            await refreshProfiles();
+          } else {
+            await activateProfile(profileId);
+          }
         } else {
           await refreshProfiles();
+        }
+
+        if (removedMod?.fileHash) {
+          await modCacheService.releaseCachedMod(removedMod.fileHash, profileId);
         }
 
         showToast({
@@ -322,6 +367,70 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     [refreshProfiles, showToast, activeProfile, activateProfile]
   );
 
+  const uninstallModsFromProfile = useCallback(
+    async (
+      profileId: string,
+      mods: Array<{ modId?: number | string; localModId?: string }>
+    ) => {
+      if (mods.length === 0) return;
+
+      try {
+        const profile = await profileService.getProfile(profileId);
+        if (!profile) {
+          throw new Error(i18n.t('contexts.profile.profile_not_found'));
+        }
+
+        const matches = (mod: ProfileMod) => mods.some((selected) =>
+          selected.localModId
+            ? mod.localModId === selected.localModId
+            : selected.modId !== undefined && mod.modId === selected.modId
+        );
+        const removedMods = profile.mods.filter(matches);
+        await profileService.updateProfile(profileId, {
+          mods: profile.mods.filter((mod) => !matches(mod)),
+        });
+
+        const useGameMirror =
+          userPreferencesService.getInstallLayoutMode() === 'game-mirror';
+
+        if (activeProfile?.id === profileId) {
+          if (useGameMirror) {
+            for (const mod of removedMods) {
+              await removeModFromLibraryIfNeeded(mod);
+            }
+            await refreshProfiles();
+          } else {
+            await activateProfile(profileId);
+          }
+        } else {
+          await refreshProfiles();
+        }
+
+        for (const mod of removedMods) {
+          if (mod.fileHash) {
+            await modCacheService.releaseCachedMod(mod.fileHash, profileId);
+          }
+        }
+
+        showToast({
+          type: 'success',
+          title: i18n.t('contexts.profile.mods_uninstalled'),
+          message: i18n.t('contexts.profile.mods_uninstalled_count', { count: removedMods.length }),
+          duration: 3000,
+        });
+      } catch (error: any) {
+        showToast({
+          type: 'error',
+          title: i18n.t('contexts.profile.failed_to_remove_mod'),
+          message: error.message || i18n.t('contexts.profile.unknown_error'),
+          duration: 5000,
+        });
+        throw error;
+      }
+    },
+    [activeProfile, activateProfile, refreshProfiles, showToast]
+  );
+
   /**
    * Toggle a mod enabled/disabled in a profile
    */
@@ -330,10 +439,32 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       try {
         await profileService.toggleModInProfile(profileId, modId, enabled, localModId);
 
-        // If toggling a mod in the active profile, re-activate it
-        // to sync the file system immediately
+        const useGameMirror =
+          userPreferencesService.getInstallLayoutMode() === 'game-mirror';
+
         if (activeProfile?.id === profileId) {
-          await activateProfile(profileId);
+          if (useGameMirror) {
+            const profile = await profileService.getProfile(profileId);
+            const mod = profile?.mods.find((entry) =>
+              localModId ? entry.localModId === localModId : entry.modId === modId
+            );
+            if (mod) {
+              if (enabled) {
+                const cachedMod = await modCacheService.getCachedMod(mod.fileHash);
+                if (cachedMod) {
+                  const libraryPaths = await installCachedModToLibrary(mod, cachedMod, {
+                    creatorName: mod.authors?.[0],
+                  });
+                  await profileService.addModToProfile(profileId, { ...mod, libraryPaths });
+                }
+              } else {
+                await removeModFromLibraryIfNeeded(mod);
+              }
+            }
+            await refreshProfiles();
+          } else {
+            await activateProfile(profileId);
+          }
         } else {
           await refreshProfiles();
         }
@@ -364,6 +495,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     activateProfile,
     addModToProfile,
     removeModFromProfile,
+    uninstallModsFromProfile,
     toggleModInProfile,
     getModsPath,
   };

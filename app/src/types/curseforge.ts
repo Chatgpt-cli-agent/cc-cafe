@@ -60,4 +60,5 @@ export interface PaginationInfo {
 export interface CurseForgeSearchResult {
   mods: CurseForgeMod[];
   pagination: PaginationInfo;
+  source?: 'live' | 'cache';
 }

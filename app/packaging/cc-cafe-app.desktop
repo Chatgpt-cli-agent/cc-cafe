@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=CC Café
+Comment=Browse, install, and manage Sims 4 custom content and mods.
+Type=Application
+Terminal=false
+Categories=Game;Utility;
+Exec=/usr/bin/env ELECTRON_OZONE_PLATFORM_HINT=x11 GDK_BACKEND=x11 "/opt/CC Café/cc-cafe-app" --ozone-platform=x11 --disable-gpu --disable-gpu-compositing --disable-gpu-vsync --disable-accelerated-2d-canvas --disable-zero-copy --disable-dev-shm-usage --disable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan,VaapiVideoDecoder,CanvasOopRasterization,WebRtcPipeWireCapturer --use-gl=disabled
+Icon=cc-cafe-app
+StartupNotify=true
+StartupWMClass=CC Café

@@ -1,9 +1,14 @@
 /**
- * Service for managing mod reports, warnings, and creator bans
- * Handles the complete lifecycle of fake mod detection and moderation
+ * Service for managing mod reports, warnings, and creator bans.
+ *
+ * This intentionally uses a local JSON store instead of Prisma. The Prisma
+ * query engine is a native Rust library and has crashed inside Electron on
+ * this Linux/KDE setup while loading the Mods page.
  */
 
-import { PrismaClient } from '@prisma/client';
+import { app } from 'electron';
+import fs from 'fs/promises';
+import path from 'path';
 import type {
   ReportSubmission,
   ModWarningStatus,
@@ -13,383 +18,296 @@ import type {
 } from '../../types/fakeDetection.types';
 import { logger } from '../../utils/logger';
 
-const prisma = new PrismaClient();
+interface StoredReport {
+  modId: number;
+  machineId: string;
+  reason: string;
+  fakeScore: number;
+  createdAt: string;
+}
 
-/**
- * Configuration constants for the reporting system
- */
+interface StoredWarning {
+  modId: number;
+  reportCount: number;
+  isAutoWarned: boolean;
+  warningReason: string;
+  creatorId: number | null;
+  updatedAt: string;
+}
+
+interface StoredBannedCreator {
+  creatorId: number;
+  creatorName: string;
+  modsBannedCount: number;
+  updatedAt: string;
+}
+
+interface ReportStore {
+  reports: StoredReport[];
+  warnings: StoredWarning[];
+  bannedCreators: StoredBannedCreator[];
+}
+
+const EMPTY_STORE: ReportStore = {
+  reports: [],
+  warnings: [],
+  bannedCreators: [],
+};
+
 const CONFIG = {
-  /** Number of reports needed to trigger automatic warning */
   REPORTS_FOR_WARNING: 3,
-  /** Number of warned mods needed to ban a creator */
   WARNINGS_FOR_BAN: 3,
 };
 
-/**
- * Service for managing mod reports, warnings, and creator bans
- */
+const emptyWarningStatus = (): ModWarningStatus => ({
+  hasWarning: false,
+  reportCount: 0,
+  isAutoWarned: false,
+  creatorBanned: false,
+});
+
 export class ReportService {
-  /**
-   * Submit a report for a suspicious mod
-   *
-   * @param modId - CurseForge mod ID
-   * @param report - Report submission data
-   * @returns Result indicating success or if already reported
-   */
-  async submitReport(modId: number, report: ReportSubmission): Promise<ReportResult> {
+  private storePath: string | null = null;
+  private writeQueue: Promise<void> = Promise.resolve();
+
+  private getStorePath(): string {
+    if (!this.storePath) {
+      this.storePath = path.join(app.getPath('userData'), 'fake-detection-store.json');
+    }
+
+    return this.storePath;
+  }
+
+  private async readStore(): Promise<ReportStore> {
     try {
-      // Check if already reported by this machine
-      const existing = await prisma.modReport.findUnique({
-        where: {
-          modId_machineId: {
-            modId,
-            machineId: report.machineId,
-          },
-        },
-      });
+      const raw = await fs.readFile(this.getStorePath(), 'utf-8');
+      const parsed = JSON.parse(raw) as Partial<ReportStore>;
 
-      if (existing) {
-        return { success: false, alreadyReported: true };
+      return {
+        reports: Array.isArray(parsed.reports) ? parsed.reports : [],
+        warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
+        bannedCreators: Array.isArray(parsed.bannedCreators) ? parsed.bannedCreators : [],
+      };
+    } catch (error: any) {
+      if (error?.code !== 'ENOENT') {
+        logger.warn('Failed to read fake detection store; using empty store', { error });
       }
 
-      // Create report
-      await prisma.modReport.create({
-        data: {
-          modId,
-          machineId: report.machineId,
-          reason: report.reason,
-          fakeScore: report.fakeScore,
-        },
-      });
-
-      logger.info(`New report submitted for mod ${modId}`, {
-        machineId: report.machineId.substring(0, 8) + '...', // Partial ID for privacy
-        fakeScore: report.fakeScore,
-      });
-
-      // Count reports for this mod
-      const reportCount = await prisma.modReport.count({
-        where: { modId },
-      });
-
-      // Auto-warn if high fake score detected (suspicious content like missing .package/.ts4script)
-      if (report.fakeScore >= 50) {
-        await this.addAutoWarning(
-          modId,
-          `Suspicious content detected: ${report.reason}`,
-          report.creatorId,
-          report.creatorName
-        );
-      }
-      // Also auto-warn if multiple reports threshold reached
-      else if (reportCount >= CONFIG.REPORTS_FOR_WARNING) {
-        await this.addOrUpdateWarning(
-          modId,
-          reportCount,
-          false,
-          `Reported by ${reportCount} users`,
-          report.creatorId,
-          report.creatorName
-        );
-      }
-
-      return { success: true, message: 'Report submitted successfully' };
-    } catch (error) {
-      logger.error('Failed to submit report', { modId, error });
-      throw error;
+      return { ...EMPTY_STORE };
     }
   }
 
-  /**
-   * Add automatic warning for a mod (when no valid mod files detected)
-   *
-   * @param modId - CurseForge mod ID
-   * @param reason - Reason for automatic warning
-   * @param creatorId - Optional creator ID for ban tracking
-   * @param creatorName - Optional creator name
-   */
+  private async writeStore(store: ReportStore): Promise<void> {
+    const write = async () => {
+      const storePath = this.getStorePath();
+      await fs.mkdir(path.dirname(storePath), { recursive: true });
+      await fs.writeFile(storePath, `${JSON.stringify(store, null, 2)}\n`, 'utf-8');
+    };
+
+    this.writeQueue = this.writeQueue.then(write, write);
+    await this.writeQueue;
+  }
+
+  async submitReport(modId: number, report: ReportSubmission): Promise<ReportResult> {
+    const store = await this.readStore();
+    const existing = store.reports.find((item) => item.modId === modId && item.machineId === report.machineId);
+
+    if (existing) {
+      return { success: false, alreadyReported: true };
+    }
+
+    store.reports.push({
+      modId,
+      machineId: report.machineId,
+      reason: report.reason,
+      fakeScore: report.fakeScore,
+      createdAt: new Date().toISOString(),
+    });
+
+    const reportCount = store.reports.filter((item) => item.modId === modId).length;
+
+    if (report.fakeScore >= 50) {
+      this.addOrUpdateWarningInStore(
+        store,
+        modId,
+        0,
+        true,
+        `Suspicious content detected: ${report.reason}`,
+        report.creatorId,
+        report.creatorName
+      );
+    } else if (reportCount >= CONFIG.REPORTS_FOR_WARNING) {
+      this.addOrUpdateWarningInStore(
+        store,
+        modId,
+        reportCount,
+        false,
+        `Reported by ${reportCount} users`,
+        report.creatorId,
+        report.creatorName
+      );
+    }
+
+    await this.writeStore(store);
+
+    logger.info(`New report submitted for mod ${modId}`, {
+      machineId: `${report.machineId.substring(0, 8)}...`,
+      fakeScore: report.fakeScore,
+    });
+
+    return { success: true, message: 'Report submitted successfully' };
+  }
+
   async addAutoWarning(
     modId: number,
     reason: string,
     creatorId?: number,
     creatorName?: string
   ): Promise<void> {
-    await this.addOrUpdateWarning(modId, 0, true, reason, creatorId, creatorName);
+    const store = await this.readStore();
+    this.addOrUpdateWarningInStore(store, modId, 0, true, reason, creatorId, creatorName);
+    await this.writeStore(store);
   }
 
-  /**
-   * Add or update warning for a mod
-   */
-  private async addOrUpdateWarning(
-    modId: number,
-    reportCount: number,
-    isAutoWarned: boolean,
-    reason: string,
-    creatorId?: number,
-    creatorName?: string
-  ): Promise<void> {
-    try {
-      await prisma.warnedMod.upsert({
-        where: { modId },
-        create: {
-          modId,
-          reportCount,
-          isAutoWarned,
-          warningReason: reason,
-          creatorId: creatorId ?? null,
-        },
-        update: {
-          reportCount,
-          isAutoWarned: isAutoWarned || undefined,
-          warningReason: reason,
-          creatorId: creatorId ?? undefined,
-        },
-      });
-
-      logger.info(`Warning added/updated for mod ${modId}`, {
-        isAutoWarned,
-        reportCount,
-        reason,
-      });
-
-      // Check if creator should be banned
-      if (creatorId) {
-        await this.checkCreatorBan(creatorId, creatorName);
-      }
-    } catch (error) {
-      logger.error('Failed to add/update warning', { modId, error });
-      throw error;
-    }
-  }
-
-  /**
-   * Check and apply creator ban if necessary
-   */
-  private async checkCreatorBan(
-    creatorId: number,
-    creatorName?: string
-  ): Promise<void> {
-    try {
-      const warnedModsCount = await prisma.warnedMod.count({
-        where: { creatorId },
-      });
-
-      if (warnedModsCount >= CONFIG.WARNINGS_FOR_BAN) {
-        // Check if already banned
-        const existingBan = await prisma.bannedCreator.findUnique({
-          where: { creatorId },
-        });
-
-        if (!existingBan) {
-          await prisma.bannedCreator.create({
-            data: {
-              creatorId,
-              creatorName: creatorName || 'Unknown',
-              modsBannedCount: warnedModsCount,
-            },
-          });
-
-          logger.warn(`Creator ${creatorId} (${creatorName}) has been banned`, {
-            warnedModsCount,
-          });
-        } else {
-          // Update count
-          await prisma.bannedCreator.update({
-            where: { creatorId },
-            data: { modsBannedCount: warnedModsCount },
-          });
-        }
-      }
-    } catch (error) {
-      logger.error('Failed to check/apply creator ban', { creatorId, error });
-      throw error;
-    }
-  }
-
-  /**
-   * Get warning status for a single mod
-   *
-   * @param modId - CurseForge mod ID
-   * @param creatorId - Optional creator ID to check for creator bans
-   * @returns Warning status including report count and creator ban status
-   */
   async getWarningStatus(modId: number, creatorId?: number): Promise<ModWarningStatus> {
-    try {
-      const warning = await prisma.warnedMod.findUnique({
-        where: { modId },
-      });
+    const store = await this.readStore();
+    const warning = store.warnings.find((item) => item.modId === modId);
+    const checkedCreatorId = warning?.creatorId || creatorId;
+    const creatorBanned = checkedCreatorId
+      ? store.bannedCreators.some((item) => item.creatorId === checkedCreatorId)
+      : false;
 
-      let creatorBanned = false;
-
-      // Check if creator is banned using creatorId from mod or from parameter
-      const checkedCreatorId = warning?.creatorId || creatorId;
-      if (checkedCreatorId) {
-        const banned = await prisma.bannedCreator.findUnique({
-          where: { creatorId: checkedCreatorId },
-        });
-        creatorBanned = !!banned;
-      }
-
-      return {
-        hasWarning: !!warning,
-        reportCount: warning?.reportCount || 0,
-        isAutoWarned: warning?.isAutoWarned || false,
-        warningReason: warning?.warningReason || undefined,
-        creatorBanned,
-      };
-    } catch (error) {
-      logger.error('Failed to get warning status', { modId, error });
-      throw error;
+    if (!warning) {
+      return { ...emptyWarningStatus(), creatorBanned };
     }
+
+    return {
+      hasWarning: true,
+      reportCount: warning.reportCount,
+      isAutoWarned: warning.isAutoWarned,
+      warningReason: warning.warningReason,
+      creatorBanned,
+    };
   }
 
-  /**
-   * Get warning status for multiple mods (batch operation)
-   *
-   * @param modIds - Array of CurseForge mod IDs
-   * @param creatorIds - Optional array of creator IDs to check for bans
-   * @returns Map of mod ID to warning status
-   */
   async getBatchWarningStatus(
     modIds: number[],
     creatorIds?: number[]
   ): Promise<BatchWarningResponse> {
-    try {
-      const warnings = await prisma.warnedMod.findMany({
-        where: { modId: { in: modIds } },
-      });
+    const store = await this.readStore();
+    const warningByModId = new Map(store.warnings.map((warning) => [warning.modId, warning]));
+    const bannedCreatorIds = new Set(store.bannedCreators.map((creator) => creator.creatorId));
+    const result: BatchWarningResponse = {};
 
-      // Collect all creator IDs to check for bans
-      const allCreatorIds = new Set<number>();
+    modIds.forEach((modId, index) => {
+      const warning = warningByModId.get(modId);
+      const creatorId = warning?.creatorId || creatorIds?.[index];
+      const creatorBanned = creatorId ? bannedCreatorIds.has(creatorId) : false;
 
-      // Add creator IDs from warnings
-      warnings.forEach((w) => {
-        if (w.creatorId !== null) {
-          allCreatorIds.add(w.creatorId);
-        }
-      });
-
-      // Add creator IDs from request (for mods without warnings)
-      if (creatorIds) {
-        creatorIds.forEach((id) => {
-          if (id) allCreatorIds.add(id);
-        });
-      }
-
-      // Batch fetch banned creators
-      const bannedCreators = await prisma.bannedCreator.findMany({
-        where: { creatorId: { in: Array.from(allCreatorIds) } },
-      });
-
-      const bannedCreatorSet = new Set(bannedCreators.map((b) => b.creatorId));
-
-      // Build response map
-      const result: BatchWarningResponse = {};
-
-      // Create a map of modId to creatorId from request
-      const modToCreator: Record<number, number> = {};
-      if (creatorIds && creatorIds.length > 0) {
-        modIds.forEach((modId, index) => {
-          if (creatorIds[index]) {
-            modToCreator[modId] = creatorIds[index];
+      result[modId] = warning
+        ? {
+            hasWarning: true,
+            reportCount: warning.reportCount,
+            isAutoWarned: warning.isAutoWarned,
+            warningReason: warning.warningReason,
+            creatorBanned,
           }
-        });
-      }
+        : { ...emptyWarningStatus(), creatorBanned };
+    });
 
-      for (const modId of modIds) {
-        const warning = warnings.find((w) => w.modId === modId);
-        const creatorId = warning?.creatorId || modToCreator[modId];
-
-        result[modId] = {
-          hasWarning: !!warning,
-          reportCount: warning?.reportCount || 0,
-          isAutoWarned: warning?.isAutoWarned || false,
-          warningReason: warning?.warningReason || undefined,
-          creatorBanned: creatorId ? bannedCreatorSet.has(creatorId) : false,
-        };
-      }
-
-      return result;
-    } catch (error) {
-      logger.error('Failed to get batch warning status', { modIds, error });
-      throw error;
-    }
+    return result;
   }
 
-  /**
-   * Check if a creator is banned
-   *
-   * @param creatorId - CurseForge creator ID
-   * @returns Ban status with reason if banned
-   */
   async isCreatorBanned(creatorId: number): Promise<CreatorBanStatus> {
-    try {
-      const banned = await prisma.bannedCreator.findUnique({
-        where: { creatorId },
-      });
+    const store = await this.readStore();
+    const banned = store.bannedCreators.find((item) => item.creatorId === creatorId);
 
-      return {
-        banned: !!banned,
-        reason: banned
-          ? `Creator has ${banned.modsBannedCount} mods with warnings`
-          : undefined,
-        modsBannedCount: banned?.modsBannedCount,
-      };
-    } catch (error) {
-      logger.error('Failed to check creator ban status', { creatorId, error });
-      throw error;
-    }
+    return {
+      banned: !!banned,
+      reason: banned ? `Creator has ${banned.modsBannedCount} mods with warnings` : undefined,
+      modsBannedCount: banned?.modsBannedCount,
+    };
   }
 
-  /**
-   * Get the ratio of fake/warned mods for a creator
-   * Used in score calculation
-   *
-   * @param creatorId - CurseForge creator ID
-   * @param totalMods - Total number of mods by this creator (from CurseForge)
-   * @returns Ratio from 0 to 1
-   */
-  async getCreatorFakeRatio(
-    creatorId: number,
-    totalMods: number = 10
-  ): Promise<number> {
-    try {
-      const warnedCount = await prisma.warnedMod.count({
-        where: { creatorId },
-      });
+  async getCreatorFakeRatio(creatorId: number, totalMods: number = 10): Promise<number> {
+    const store = await this.readStore();
+    const warnedCount = store.warnings.filter((warning) => warning.creatorId === creatorId).length;
 
-      if (warnedCount === 0 || totalMods === 0) {
-        return 0;
-      }
-
-      return Math.min(warnedCount / totalMods, 1);
-    } catch (error) {
-      logger.error('Failed to get creator fake ratio', { creatorId, error });
+    if (warnedCount === 0 || totalMods === 0) {
       return 0;
     }
+
+    return Math.min(warnedCount / totalMods, 1);
   }
 
-  /**
-   * Get report count for a specific mod
-   */
   async getReportCount(modId: number): Promise<number> {
-    return prisma.modReport.count({
-      where: { modId },
-    });
+    const store = await this.readStore();
+    return store.reports.filter((report) => report.modId === modId).length;
   }
 
-  /**
-   * Check if a machine has already reported a mod
-   */
   async hasAlreadyReported(modId: number, machineId: string): Promise<boolean> {
-    const existing = await prisma.modReport.findUnique({
-      where: {
-        modId_machineId: { modId, machineId },
-      },
+    const store = await this.readStore();
+    return store.reports.some((report) => report.modId === modId && report.machineId === machineId);
+  }
+
+  private addOrUpdateWarningInStore(
+    store: ReportStore,
+    modId: number,
+    reportCount: number,
+    isAutoWarned: boolean,
+    warningReason: string,
+    creatorId?: number,
+    creatorName?: string
+  ): void {
+    const existing = store.warnings.find((warning) => warning.modId === modId);
+    const now = new Date().toISOString();
+
+    if (existing) {
+      existing.reportCount = reportCount;
+      existing.isAutoWarned = existing.isAutoWarned || isAutoWarned;
+      existing.warningReason = warningReason;
+      existing.creatorId = creatorId ?? existing.creatorId;
+      existing.updatedAt = now;
+    } else {
+      store.warnings.push({
+        modId,
+        reportCount,
+        isAutoWarned,
+        warningReason,
+        creatorId: creatorId ?? null,
+        updatedAt: now,
+      });
+    }
+
+    if (creatorId) {
+      this.checkCreatorBanInStore(store, creatorId, creatorName);
+    }
+  }
+
+  private checkCreatorBanInStore(store: ReportStore, creatorId: number, creatorName?: string): void {
+    const warnedModsCount = store.warnings.filter((warning) => warning.creatorId === creatorId).length;
+
+    if (warnedModsCount < CONFIG.WARNINGS_FOR_BAN) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const existing = store.bannedCreators.find((creator) => creator.creatorId === creatorId);
+
+    if (existing) {
+      existing.modsBannedCount = warnedModsCount;
+      existing.creatorName = creatorName || existing.creatorName;
+      existing.updatedAt = now;
+      return;
+    }
+
+    store.bannedCreators.push({
+      creatorId,
+      creatorName: creatorName || 'Unknown',
+      modsBannedCount: warnedModsCount,
+      updatedAt: now,
     });
-    return !!existing;
   }
 }
 
-// Export singleton instance
 export const reportService = new ReportService();

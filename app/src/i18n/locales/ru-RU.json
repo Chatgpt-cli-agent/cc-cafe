@@ -110,9 +110,18 @@
       "no_mod_files": "Файлы модов не найдены в архиве"
     },
     "remove_modal": {
-      "title": "Удалить мод",
-      "message": "Вы уверены, что хотите удалить «{{modName}}» из профиля? Это действие нельзя отменить.",
+      "title": "Удалить мод из приложения",
+      "message": "Удалить «{{modName}}» из этого профиля? Управляемые файлы будут удалены из папки Mods. Общий кэш сохранится, если мод используется другим профилем.",
       "confirm": "Удалить"
+    },
+    "bulk": {
+      "select_all": "Выбрать все",
+      "clear_filtered": "Снять выбор с отфильтрованных",
+      "clear": "Очистить выбор",
+      "uninstall_selected": "Удалить выбранные ({{count}})",
+      "select_item": "Выбрать {{modName}}",
+      "modal_title": "Удалить выбранные моды",
+      "modal_message": "Удалить {{count}} выбранных модов из этого профиля? Управляемые файлы будут удалены из папки Mods."
     }
   },
   "profiles": {
@@ -177,6 +186,13 @@
       "mods_not_found": "Папка модов не найдена",
       "game_path_updated": "Путь к игре обновлен",
       "mods_path_updated": "Путь к папке модов обновлен",
+      "inzoi_folder": "Папка inZOI",
+      "inzoi_folder_placeholder": "Documents/inZOI",
+      "inzoi_folder_hint": "Папка Documents/inZOI. CC Café просматривает внутри неё Mods, Canvas, Creations и My 3D Printer. Оставьте пустым, чтобы использовать обычную папку.",
+      "paralives_folder": "Папка модов Paralives",
+      "paralives_folder_placeholder": "Папка модов Paralives",
+      "paralives_folder_hint": "Папка, в которой лежат папки .mod Paralives. Оставьте пустым, чтобы использовать обычные папки.",
+      "content_path_updated": "Папка контента обновлена",
       "failed_to_save": "Не удалось сохранить путь"
     },
     "api_keys": {
@@ -203,6 +219,19 @@
         "title": "Резервное копирование перед обновлением",
         "description": "Создавать копию перезаписанных файлов в папке /Backups."
       },
+      "install_layout": {
+        "title": "Download layout",
+        "description": "Choose where installed CC files are placed inside your Mods folder.",
+        "options": {
+          "mods_folder": "Mods folder",
+          "creator_folder": "Creator folder",
+          "creator_cc_folder": "Creator / item",
+          "cc_folder": "CC folder",
+          "game_mirror": "Game mirror"
+        }
+      },
+      "library_root": { "title": "Library folder", "description": "Stores downloaded content in CC Cafe Library under your Documents folder by default. Use the folder picker to choose another location.", "detected": "Library folder found", "not_found": "Library folder not found" },
+      "deploy_to_game": { "title": "Deploy library to game", "description": "Copy CC, Tray, and Gameplay Mods from the library into your game folders without overwriting existing files.", "button": "Deploy to game", "running": "Deploying...", "success": "Deployed {{copied}} file(s). {{conflicts}} existing file(s) were left unchanged.", "failed": "Deploy failed", "missing_paths": "Configure both the library folder and mods folder before deploying." },
       "fake_detection": {
         "title": "Обнаружение фейковых модов",
         "description": "Показывать предупреждения и блокировать забаненных авторов при обнаружении подозрительных модов."
@@ -633,10 +662,13 @@
       "failed_to_activate": "Не удалось активировать профиль",
       "still_initializing": "Система профилей все еще инициализируется. Пожалуйста, подождите и попробуйте снова.",
       "mods_path_not_configured": "Путь к модам не настроен. Не удалось найти установку The Sims 4.",
+      "library_path_not_configured": "Library folder not configured. Set it in Settings before activating a profile in game-mirror mode.",
       "profile_not_found": "Профиль не найден",
       "failed_to_create_symlinks": "Не удалось создать {{count}} символических ссылок:\n{{errors}}\n\nПроверьте права доступа и убедитесь, что The Sims 4 не запущен.",
       "mod_removed": "Мод удален",
       "mod_removed_from_profile": "Мод удален из профиля",
+      "mods_uninstalled": "Моды удалены",
+      "mods_uninstalled_count": "Из профиля удалено модов: {{count}}",
       "failed_to_remove_mod": "Не удалось удалить мод"
     },
     "update": {

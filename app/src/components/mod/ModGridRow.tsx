@@ -1,7 +1,7 @@
 /**
  * Grid Row Component for Virtualized Grid
  *
- * Displays a row of mod cards for use with react-window virtualization
+ * Displays a row of dense S4MM-style mod tiles.
  */
 
 'use client';
@@ -21,28 +21,29 @@ interface ModGridRowProps {
   warningStatuses?: Record<number, ModWarningStatus>;
 }
 
+const GRID_COLS_CLASS: Record<number, string> = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-2',
+  3: 'grid-cols-3',
+  4: 'grid-cols-4',
+  5: 'grid-cols-5',
+  6: 'grid-cols-6',
+  7: 'grid-cols-7',
+  8: 'grid-cols-8',
+  9: 'grid-cols-9',
+  10: 'grid-cols-10',
+  11: 'grid-cols-11',
+  12: 'grid-cols-12',
+};
+
 /**
- * Row component containing multiple mod cards
- * Used with react-window List for virtualized grid rendering
- *
- * Responsive column layout:
- * - Mobile (xs): 1 column (4 cards per row if width allows)
- * - Tablet (md): 2 columns
- * - Desktop (lg): 3 columns
- * - Large (xl): 4 columns
+ * Row of dense square mod tiles for the Menu browse grid.
  */
 export default function ModGridRow({ mods, index, columns, warningStatuses = {} }: ModGridRowProps) {
-  // Determine grid class based on columns
-  const gridColsClass = {
-    1: 'grid-cols-1',
-    2: 'grid-cols-2',
-    3: 'grid-cols-3',
-    4: 'grid-cols-4',
-    5: 'grid-cols-5',
-  }[columns] || 'grid-cols-4';
+  const gridColsClass = GRID_COLS_CLASS[columns] || 'grid-cols-8';
 
   return (
-    <div className={`grid ${gridColsClass} gap-4 px-4 lg:px-8 py-4 pb-4`}>
+    <div className={`grid ${gridColsClass} gap-x-3 gap-y-4 px-4 lg:px-8 py-2`} data-row-index={index}>
       {mods.map((mod) => (
         <ModCard key={mod.id} mod={mod} warningStatus={warningStatuses[mod.id]} />
       ))}

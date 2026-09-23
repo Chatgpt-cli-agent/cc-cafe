@@ -110,9 +110,18 @@
       "no_mod_files": "संग्रह में कोई मॉड फ़ाइलें नहीं मिलीं"
     },
     "remove_modal": {
-      "title": "मॉड हटाएँ",
-      "message": "क्या आप वाकई \"{{modName}}\" को अपनी प्रोफ़ाइल से हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।",
-      "confirm": "हटाएँ"
+      "title": "मॉड अनइंस्टॉल करें",
+      "message": "क्या इस प्रोफ़ाइल से \"{{modName}}\" को अनइंस्टॉल करना है? इसकी प्रबंधित फ़ाइलें Mods फ़ोल्डर से हटा दी जाएँगी। यदि कोई अन्य प्रोफ़ाइल इसका उपयोग करती है तो साझा कैश रखा जाएगा।",
+      "confirm": "अनइंस्टॉल करें"
+    },
+    "bulk": {
+      "select_all": "सभी चुनें",
+      "clear_filtered": "फ़िल्टर किए गए हटाएँ",
+      "clear": "चयन साफ़ करें",
+      "uninstall_selected": "चुने हुए अनइंस्टॉल करें ({{count}})",
+      "select_item": "{{modName}} चुनें",
+      "modal_title": "चुने हुए मॉड अनइंस्टॉल करें",
+      "modal_message": "इस प्रोफ़ाइल से चुने हुए {{count}} मॉड अनइंस्टॉल करें? उनकी प्रबंधित फ़ाइलें Mods फ़ोल्डर से हटा दी जाएँगी।"
     }
   },
   "profiles": {
@@ -177,6 +186,13 @@
       "mods_not_found": "मॉड्स फ़ोल्डर नहीं मिला",
       "game_path_updated": "गेम पथ अपडेट हो गया",
       "mods_path_updated": "मॉड्स पथ अपडेट हो गया",
+      "inzoi_folder": "inZOI फ़ोल्डर",
+      "inzoi_folder_placeholder": "Documents/inZOI",
+      "inzoi_folder_hint": "Documents/inZOI फ़ोल्डर। CC Café इसके अंदर Mods, Canvas, Creations और My 3D Printer देखता है। सामान्य फ़ोल्डर के लिए इसे खाली छोड़ें।",
+      "paralives_folder": "Paralives मॉड्स फ़ोल्डर",
+      "paralives_folder_placeholder": "Paralives मॉड्स फ़ोल्डर",
+      "paralives_folder_hint": "वह फ़ोल्डर जिसमें Paralives की .mod फ़ोल्डरें हैं। सामान्य फ़ोल्डरों के लिए इसे खाली छोड़ें।",
+      "content_path_updated": "कंटेंट फ़ोल्डर अपडेट हो गया",
       "failed_to_save": "पथ सहेजने में विफल"
     },
     "api_keys": {
@@ -203,6 +219,19 @@
         "title": "अपडेट से पहले बैकअप",
         "description": "/Backups फ़ोल्डर में ओवरराइट किए गए फ़ाइलों की प्रतिलिपि बनाएँ।"
       },
+      "install_layout": {
+        "title": "Download layout",
+        "description": "Choose where installed CC files are placed inside your Mods folder.",
+        "options": {
+          "mods_folder": "Mods folder",
+          "creator_folder": "Creator folder",
+          "creator_cc_folder": "Creator / item",
+          "cc_folder": "CC folder",
+          "game_mirror": "Game mirror"
+        }
+      },
+      "library_root": { "title": "Library folder", "description": "Stores downloaded content in CC Cafe Library under your Documents folder by default. Use the folder picker to choose another location.", "detected": "Library folder found", "not_found": "Library folder not found" },
+      "deploy_to_game": { "title": "Deploy library to game", "description": "Copy CC, Tray, and Gameplay Mods from the library into your game folders without overwriting existing files.", "button": "Deploy to game", "running": "Deploying...", "success": "Deployed {{copied}} file(s). {{conflicts}} existing file(s) were left unchanged.", "failed": "Deploy failed", "missing_paths": "Configure both the library folder and mods folder before deploying." },
       "fake_detection": {
         "title": "नकली मॉड पहचान",
         "description": "संदिग्ध मॉड्स का पता चलने पर चेतावनियाँ दिखाएँ और प्रतिबंधित निर्माताओं को ब्लॉक करें।"
@@ -633,10 +662,13 @@
       "failed_to_activate": "प्रोफ़ाइल सक्रिय करने में विफल",
       "still_initializing": "प्रोफ़ाइल सिस्टम अभी भी आरंभ हो रहा है। कृपया कुछ क्षण प्रतीक्षा करें और पुनः प्रयास करें।",
       "mods_path_not_configured": "मॉड्स पथ कॉन्फ़िगर नहीं किया गया। The Sims 4 इंस्टॉलेशन नहीं मिल सका।",
+      "library_path_not_configured": "Library folder not configured. Set it in Settings before activating a profile in game-mirror mode.",
       "profile_not_found": "प्रोफ़ाइल नहीं मिली",
       "failed_to_create_symlinks": "{{count}} सिम्लिंक्स बनाने में विफल:\n{{errors}}\n\nअनुमतियों की जाँच करें और सुनिश्चित करें कि The Sims 4 नहीं चल रहा है।",
       "mod_removed": "मॉड हटाया गया",
       "mod_removed_from_profile": "प्रोफ़ाइल से मॉड हटाया गया",
+      "mods_uninstalled": "मॉड अनइंस्टॉल किए गए",
+      "mods_uninstalled_count": "प्रोफ़ाइल से {{count}} मॉड अनइंस्टॉल किए गए",
       "failed_to_remove_mod": "मॉड हटाने में विफल"
     },
     "update": {

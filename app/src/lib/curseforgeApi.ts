@@ -92,7 +92,7 @@ const StorageHelper = {
  * Get the CurseForge API key from local storage and decrypt it
  * @returns The decrypted API key or null if not configured
  */
-async function getCurseForgeApiKey(): Promise<string | null> {
+export async function getCurseForgeApiKey(): Promise<string | null> {
   const encryptedKey = StorageHelper.getLocal('cccafe_api_key');
   if (!encryptedKey) {
     return null;
@@ -111,6 +111,7 @@ export interface SearchModsParams {
   sortBy?: 'downloads' | 'date' | 'popularity' | 'relevance';
   categoryName?: string;
   authorId?: number;
+  gameSlug?: string;
 }
 
 /**
@@ -143,6 +144,9 @@ export async function searchCurseForgeMods(
   }
   if (params.authorId) {
     queryParams.append('authorId', params.authorId.toString());
+  }
+  if (params.gameSlug) {
+    queryParams.append('gameSlug', params.gameSlug);
   }
 
   const queryString = queryParams.toString();

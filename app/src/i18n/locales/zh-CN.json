@@ -110,9 +110,18 @@
       "no_mod_files": "归档中未找到模组文件"
     },
     "remove_modal": {
-      "title": "移除模组",
-      "message": "确定要从配置文件中移除「{{modName}}」吗？此操作无法撤销。",
-      "confirm": "移除"
+      "title": "卸载模组",
+      "message": "要从此配置文件卸载「{{modName}}」吗？其托管文件将从 Mods 文件夹中删除。如果其他配置文件仍在使用，共享缓存将被保留。",
+      "confirm": "卸载"
+    },
+    "bulk": {
+      "select_all": "全选",
+      "clear_filtered": "取消选择筛选项",
+      "clear": "清除选择",
+      "uninstall_selected": "卸载所选项（{{count}}）",
+      "select_item": "选择 {{modName}}",
+      "modal_title": "卸载所选模组",
+      "modal_message": "要从此配置文件卸载所选的 {{count}} 个模组吗？其托管文件将从 Mods 文件夹中删除。"
     }
   },
   "profiles": {
@@ -177,6 +186,13 @@
       "mods_not_found": "未找到模组文件夹",
       "game_path_updated": "游戏路径已更新",
       "mods_path_updated": "模组路径已更新",
+      "inzoi_folder": "inZOI 文件夹",
+      "inzoi_folder_placeholder": "Documents/inZOI",
+      "inzoi_folder_hint": "Documents/inZOI 文件夹。CC Café 会扫描其中的 Mods、Canvas、Creations 和 My 3D Printer。留空则使用这个默认文件夹。",
+      "paralives_folder": "Paralives 模组文件夹",
+      "paralives_folder_placeholder": "Paralives 模组文件夹",
+      "paralives_folder_hint": "包含 Paralives .mod 文件夹的目录。留空则使用默认文件夹。",
+      "content_path_updated": "内容文件夹已更新",
       "failed_to_save": "保存路径失败"
     },
     "api_keys": {
@@ -203,6 +219,19 @@
         "title": "更新前备份",
         "description": "将覆盖的文件复制到 /Backups 文件夹中。"
       },
+      "install_layout": {
+        "title": "Download layout",
+        "description": "Choose where installed CC files are placed inside your Mods folder.",
+        "options": {
+          "mods_folder": "Mods folder",
+          "creator_folder": "Creator folder",
+          "creator_cc_folder": "Creator / item",
+          "cc_folder": "CC folder",
+          "game_mirror": "Game mirror"
+        }
+      },
+      "library_root": { "title": "Library folder", "description": "Stores downloaded content in CC Cafe Library under your Documents folder by default. Use the folder picker to choose another location.", "detected": "Library folder found", "not_found": "Library folder not found" },
+      "deploy_to_game": { "title": "Deploy library to game", "description": "Copy CC, Tray, and Gameplay Mods from the library into your game folders without overwriting existing files.", "button": "Deploy to game", "running": "Deploying...", "success": "Deployed {{copied}} file(s). {{conflicts}} existing file(s) were left unchanged.", "failed": "Deploy failed", "missing_paths": "Configure both the library folder and mods folder before deploying." },
       "fake_detection": {
         "title": "假模组检测",
         "description": "检测到可疑模组时显示警告并阻止已封禁的创作者。"
@@ -633,10 +662,13 @@
       "failed_to_activate": "激活配置文件失败",
       "still_initializing": "配置文件系统仍在初始化中。请稍候再试。",
       "mods_path_not_configured": "模组路径未配置。无法找到 The Sims 4 安装。",
+      "library_path_not_configured": "Library folder not configured. Set it in Settings before activating a profile in game-mirror mode.",
       "profile_not_found": "未找到配置文件",
       "failed_to_create_symlinks": "创建 {{count}} 个符号链接失败：\n{{errors}}\n\n请检查权限并确保 The Sims 4 未在运行。",
       "mod_removed": "模组已移除",
       "mod_removed_from_profile": "模组已从配置文件中移除",
+      "mods_uninstalled": "模组已卸载",
+      "mods_uninstalled_count": "已从配置文件卸载 {{count}} 个模组",
       "failed_to_remove_mod": "移除模组失败"
     },
     "update": {

@@ -4,11 +4,14 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useProfiles } from '@/context/ProfileContext';
 import { useUpdates } from '@/context/UpdateContext';
-import { MagnifyingGlass, DownloadSimple, UserList, GearSix, Toolbox } from '@phosphor-icons/react';
+import { MagnifyingGlass, DownloadSimple, UserList, GearSix, Toolbox, Notebook } from '@phosphor-icons/react';
 import ProfileSelector from '@/components/profile/ProfileSelector';
 import UpdateCountBadge from '@/components/update/UpdateCountBadge';
 import { useTranslation } from 'react-i18next';
 import { BRANDING } from '@/lib/branding';
+import { BUILD_LABEL } from '@/lib/buildInfo';
+import { useGame, GAME_IDS } from '@/context/GameContext';
+import { GAMES } from '@/lib/games';
 
 interface SidebarProps {
   onThemeToggle: () => void;
@@ -21,12 +24,14 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
   const { activeProfile, profiles, activateProfile, isInitialized } = useProfiles();
   const { updateCount } = useUpdates();
   const { t } = useTranslation();
+  const { gameId, setGameId } = useGame();
 
   // Map current pathname to active nav item
   const getActiveNav = () => {
     if (pathname === '/' || pathname?.startsWith('/mods')) return 'browse';
     if (pathname === '/library') return 'library';
     if (pathname === '/tools') return 'tools';
+    if (pathname === '/cafedex') return 'cafedex';
     if (pathname === '/profiles') return 'profiles';
     return null;
   };
@@ -53,9 +58,14 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
                 <path d="M12 2L3 11L12 22L21 11L12 2Z" />
               </svg>
             </div>
-            <div className="flex items-end gap-1 font-black tracking-tight">
-              <span className="text-[28px] leading-none text-white">CC</span>
-              <span className="text-[28px] leading-none text-brand-green">CAFÉ</span>
+            <div>
+              <div className="flex items-end gap-1 font-black tracking-tight">
+                <span className="text-[28px] leading-none text-white">CC</span>
+                <span className="text-[28px] leading-none text-brand-green">CAFÉ</span>
+              </div>
+              <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-green">
+                {BUILD_LABEL}
+              </div>
             </div>
           </div>
           <div className="w-8 h-8 text-brand-green flex-shrink-0 flex items-center justify-center lg:hidden">
@@ -68,6 +78,34 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
 
       {/* Profiles Section */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        <div className="hidden lg:block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+          Game
+        </div>
+        <div className="space-y-1">
+          {GAME_IDS.map((id) => {
+            const selected = gameId === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setGameId(id)}
+                className="w-full rounded-md px-3 py-2 text-left text-sm cursor-pointer"
+                style={{
+                  backgroundColor: selected ? 'var(--ui-hover)' : 'transparent',
+                  color: selected ? '#46C89B' : 'var(--text-secondary)',
+                  fontWeight: selected ? 600 : 400,
+                }}
+              >
+                <span className="hidden lg:block">{GAMES[id].name}</span>
+                <span className="lg:hidden block text-center text-xs">{GAMES[id].name.split(' ').pop()}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div
+          className="border-t my-2"
+          style={{ borderColor: 'var(--border-color)' }}
+        />
         <div
           className="hidden lg:block text-xs font-semibold uppercase tracking-wider"
           style={{
@@ -99,6 +137,7 @@ export default function Sidebar({ onThemeToggle, theme }: SidebarProps) {
             { id: 'browse', label: BRANDING.sidebar.browse, icon: MagnifyingGlass, href: '/' },
             { id: 'library', label: BRANDING.sidebar.pantry, icon: DownloadSimple, href: '/library', badge: updateCount },
             { id: 'tools', label: 'Tools', icon: Toolbox, href: '/tools' },
+            { id: 'cafedex', label: 'CafeDex', icon: Notebook, href: '/cafedex' },
             { id: 'profiles', label: BRANDING.sidebar.profiles, icon: UserList, href: '/profiles' },
           ].map(({ id, label, icon: Icon, href, badge }) => {
             const isActive = getActiveNav() === id && !href.includes('filter=updates');

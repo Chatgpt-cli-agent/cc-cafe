@@ -2,13 +2,23 @@
 
 CC Café is an open-source Sims 4 mod manager built as a monolithic Electron + Next.js desktop app.
 
+New installations use `CC Cafe Library` inside the current user's Documents folder. The obsolete JDownloader default migrates automatically; explicitly selected library folders are preserved. Use the folder picker in Settings to choose another mounted drive. The library stores downloaded content; deployment to the game's Mods and Tray folders is a separate operation.
+
+CurseForge "Save Files" downloads (e.g. "Ultimate Saves") are installed into `Documents/Electronic Arts/The Sims 4/saves`, flattened to the folder root as the game requires. Any existing file at a target slot is renamed aside (`.cc-cafe-backup-<timestamp>`) before the new save is copied in, never deleted. Save packages are tracked in your profile like mods but are never symlinked or mirrored into the Mods folder or the library.
+
 ## What It Does
 
 - CurseForge browse, creators, downloads, and updates
-- Local mod import and profile management
+- Game switcher for The Sims 4, inZOI (CurseForge and Canvas), and Paralives (Steam Workshop `.mod` folders). Settings can point at the inZOI folder and the Paralives mods folder; empty paths keep the usual locations. Sims 4 package tools stay on The Sims 4.
+- CafeDex records scanned mods by fingerprint, a broken mark, and a personal note. The package files stay in the game folder.
+- Dedicated Favorites panel for followed creators (separate from Counter / Fresh Picks)
+- Dense S4MM-style Menu grid (square tiles with installed checkmarks)
+- Local mod import (.package, .ts4script, .zip, .rar) and profile management
 - Fake mod detection and reporting
 - S4MM-style tools for duplicate scans, CC package analysis, ID conflict checks, polygon scans, empty folder cleanup, and pack disable commands
+- S4MM 2.0 tool ports: CurseForge fingerprint matching, 3D CAS viewer (meshes and animation clips), HQ texture scan, merged package extraction, loading screen and main menu creators, TGI checker, region map checker, and save file reader
 - Sims Log Enabler installation and game log viewing
+- Resizable desktop window
 
 ## Repository Layout
 
@@ -77,4 +87,4 @@ npm run release
 ## Notes
 
 - The top-level `updates/` folder is kept for release artifacts and manifest output.
-
+- CC Café does not register or handle The Sims Resource's `tsrcc:` links. Those links remain owned by TSR CC Manager.

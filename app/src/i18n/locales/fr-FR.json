@@ -110,9 +110,18 @@
       "no_mod_files": "Aucun fichier de mod trouvé dans l'archive"
     },
     "remove_modal": {
-      "title": "Supprimer le mod",
-      "message": "Êtes-vous sûr de vouloir supprimer « {{modName}} » de votre profil ? Cette action est irréversible.",
-      "confirm": "Supprimer"
+      "title": "Désinstaller le mod",
+      "message": "Désinstaller « {{modName}} » de ce profil ? Ses fichiers gérés seront supprimés du dossier Mods. Le cache partagé sera conservé si un autre profil l’utilise encore.",
+      "confirm": "Désinstaller"
+    },
+    "bulk": {
+      "select_all": "Tout sélectionner",
+      "clear_filtered": "Désélectionner les filtrés",
+      "clear": "Effacer",
+      "uninstall_selected": "Désinstaller la sélection ({{count}})",
+      "select_item": "Sélectionner {{modName}}",
+      "modal_title": "Désinstaller les mods sélectionnés",
+      "modal_message": "Désinstaller {{count}} mods sélectionnés de ce profil ? Leurs fichiers gérés seront supprimés du dossier Mods."
     }
   },
   "profiles": {
@@ -177,6 +186,13 @@
       "mods_not_found": "Dossier des mods introuvable",
       "game_path_updated": "Chemin du jeu mis à jour",
       "mods_path_updated": "Chemin du dossier des mods mis à jour",
+      "inzoi_folder": "Dossier inZOI",
+      "inzoi_folder_placeholder": "Documents/inZOI",
+      "inzoi_folder_hint": "Le dossier Documents/inZOI. CC Café parcourt Mods, Canvas, Creations et My 3D Printer à l'intérieur. Laissez vide pour utiliser ce dossier habituel.",
+      "paralives_folder": "Dossier de mods Paralives",
+      "paralives_folder_placeholder": "Dossier de mods Paralives",
+      "paralives_folder_hint": "Le dossier qui contient les dossiers .mod de Paralives. Laissez vide pour utiliser les dossiers habituels.",
+      "content_path_updated": "Dossier de contenu mis à jour",
       "failed_to_save": "Échec de la sauvegarde du chemin"
     },
     "api_keys": {
@@ -203,6 +219,19 @@
         "title": "Sauvegarde avant mise à jour",
         "description": "Créez une copie des fichiers écrasés dans le dossier /Backups."
       },
+      "install_layout": {
+        "title": "Download layout",
+        "description": "Choose where installed CC files are placed inside your Mods folder.",
+        "options": {
+          "mods_folder": "Mods folder",
+          "creator_folder": "Creator folder",
+          "creator_cc_folder": "Creator / item",
+          "cc_folder": "CC folder",
+          "game_mirror": "Game mirror"
+        }
+      },
+      "library_root": { "title": "Library folder", "description": "Stores downloaded content in CC Cafe Library under your Documents folder by default. Use the folder picker to choose another location.", "detected": "Library folder found", "not_found": "Library folder not found" },
+      "deploy_to_game": { "title": "Deploy library to game", "description": "Copy CC, Tray, and Gameplay Mods from the library into your game folders without overwriting existing files.", "button": "Deploy to game", "running": "Deploying...", "success": "Deployed {{copied}} file(s). {{conflicts}} existing file(s) were left unchanged.", "failed": "Deploy failed", "missing_paths": "Configure both the library folder and mods folder before deploying." },
       "fake_detection": {
         "title": "Détection de mods faux",
         "description": "Affichez des avertissements et bloquez les créateurs bannis lors de la détection de mods suspects."
@@ -633,10 +662,13 @@
       "failed_to_activate": "Échec de l'activation du profil",
       "still_initializing": "Le système de profil est en cours d'initialisation. Veuillez patienter un instant et réessayer.",
       "mods_path_not_configured": "Chemin des mods non configuré. Impossible de trouver l'installation de The Sims 4.",
+      "library_path_not_configured": "Library folder not configured. Set it in Settings before activating a profile in game-mirror mode.",
       "profile_not_found": "Profil introuvable",
       "failed_to_create_symlinks": "Échec de la création de {{count}} liens symboliques :\n{{errors}}\n\nVérifiez les permissions et assurez-vous que The Sims 4 n'est pas en cours d'exécution.",
       "mod_removed": "Mod supprimé",
       "mod_removed_from_profile": "Mod supprimé du profil",
+      "mods_uninstalled": "Mods désinstallés",
+      "mods_uninstalled_count": "{{count}} mods ont été désinstallés du profil",
       "failed_to_remove_mod": "Échec de la suppression du mod"
     },
     "update": {
