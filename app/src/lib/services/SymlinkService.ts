@@ -10,6 +10,10 @@ import type { CachedModFile, InstallLayoutMode, SymlinkResult, SymlinkError } fr
 import { sanitizeDisplayFolderName, sanitizeModName } from '@/utils/pathSanitizer';
 import { diskPerformanceService } from './DiskPerformanceService';
 import {
+  ensureLibraryRoots,
+  resolveLibraryDestination,
+} from './LibraryPathsService';
+import {
   concurrentMap,
   getSuccessful,
   getFailed,
@@ -21,15 +25,30 @@ interface SymlinkPath {
   creatorName?: string;
   installLayoutMode?: InstallLayoutMode;
   files?: CachedModFile[];
+  modId?: number | string;
+  localModId?: string;
+  fileHash?: string;
+}
+
+function getModInstallKey(item: Pick<SymlinkPath, 'modId' | 'localModId'>): number | string {
+  if (item.modId !== undefined && item.modId !== null) {
+    return item.modId;
+  }
+  if (item.localModId) {
+    return item.localModId;
+  }
+  throw new Error('Game-mirror install requires modId or localModId');
 }
 
 interface ManagedPathEntry {
   path: string;
   type: 'file' | 'dir';
+  modId?: number | string;
+  fileHash?: string;
 }
 
 interface ManagedFilesManifest {
-  version: 1;
+  version: 2;
   entries: ManagedPathEntry[];
 }
 
@@ -55,6 +74,10 @@ export class SymlinkService {
     modsPath: string,
     cachePaths: SymlinkPath[]
   ): Promise<SymlinkResult> {
+    if (cachePaths.some((item) => item.installLayoutMode === 'game-mirror')) {
+      return this.activateGameMirrorLibrary(modsPath, cachePaths);
+    }
+
     const errors: SymlinkError[] = [];
     let created = 0;
     let failed = 0;
@@ -112,6 +135,179 @@ export class SymlinkService {
         targetPath,
         error: String(error),
       });
+    }
+
+    return {
+      success: failed === 0,
+      created,
+      failed,
+      errors,
+    };
+  }
+
+  /**
+   * Install or update one mod in the game-mirror library without touching other mods.
+   */
+  async installModToLibrary(
+    libraryRoot: string,
+    item: SymlinkPath
+  ): Promise<{ paths: string[]; result: SymlinkResult }> {
+    if (!item.files || item.files.length === 0) {
+      throw new Error('Game-mirror install requires extracted files');
+    }
+
+    const modKey = getModInstallKey(item);
+    await ensureLibraryRoots(libraryRoot);
+    await this.removeModFromLibrary(libraryRoot, modKey);
+
+    const errors: SymlinkError[] = [];
+    const installedPaths: string[] = [];
+    let created = 0;
+    let failed = 0;
+    const copySource = await this.resolveCopySource(item.source, item);
+    const managedEntries: ManagedPathEntry[] = [];
+
+    for (const file of item.files) {
+      try {
+        const sourceFile = await this.joinRelativePath(copySource, file.relativePath || file.fileName);
+        const destination = await resolveLibraryDestination(
+          libraryRoot,
+          item.creatorName || item.modName,
+          item.modName,
+          file,
+          item.files
+        );
+        const resolvedDestination = await this.resolveCollisionFreeDestination(
+          destination,
+          sourceFile,
+          item.fileHash
+        );
+        const resolvedHash =
+          item.fileHash ||
+          (await window.electron.ipcRenderer.invoke('crypto:hashFile', sourceFile));
+
+        if (
+          resolvedDestination === destination &&
+          (await window.electron.ipcRenderer.invoke('fs:exists', destination))
+        ) {
+          installedPaths.push(destination);
+          managedEntries.push({
+            path: destination,
+            type: 'file',
+            modId: modKey,
+            fileHash: resolvedHash,
+          });
+          continue;
+        }
+
+        await window.electron.ipcRenderer.invoke(
+          'fs:mkdir',
+          await window.electron.ipcRenderer.invoke('path:dirname', resolvedDestination),
+          { recursive: true }
+        );
+        await window.electron.ipcRenderer.invoke('fs:copyFile', sourceFile, resolvedDestination);
+        installedPaths.push(resolvedDestination);
+        managedEntries.push({
+          path: resolvedDestination,
+          type: 'file',
+          modId: modKey,
+          fileHash: resolvedHash,
+        });
+        created += 1;
+      } catch (error) {
+        failed += 1;
+        errors.push({
+          sourcePath: item.source,
+          targetPath: file.fileName,
+          error: String(error),
+        });
+      }
+    }
+
+    if (managedEntries.length > 0) {
+      await this.appendManagedFilesManifest(libraryRoot, managedEntries);
+    }
+
+    return {
+      paths: installedPaths,
+      result: {
+        success: failed === 0,
+        created,
+        failed,
+        errors,
+      },
+    };
+  }
+
+  /**
+   * Remove only the files previously installed for one CC Cafe mod.
+   */
+  async removeModFromLibrary(
+    libraryRoot: string,
+    modId: number | string
+  ): Promise<SymlinkResult> {
+    const manifest = await this.readManagedFilesManifest(libraryRoot);
+    if (!manifest) {
+      return { success: true, created: 0, failed: 0, errors: [] };
+    }
+
+    const remaining: ManagedPathEntry[] = [];
+    const toRemove = manifest.entries.filter((entry) => entry.modId === modId);
+    const errors: SymlinkError[] = [];
+    let created = 0;
+    let failed = 0;
+
+    for (const entry of [...toRemove].sort((a, b) => b.path.length - a.path.length)) {
+      try {
+        if (await window.electron.ipcRenderer.invoke('fs:exists', entry.path)) {
+          await window.electron.ipcRenderer.invoke('fs:remove', entry.path, {
+            recursive: entry.type === 'dir',
+          });
+          created += 1;
+        }
+      } catch (error) {
+        failed += 1;
+        errors.push({
+          sourcePath: '',
+          targetPath: entry.path,
+          error: String(error),
+        });
+      }
+    }
+
+    for (const entry of manifest.entries) {
+      if (entry.modId !== modId) {
+        remaining.push(entry);
+      }
+    }
+
+    if (remaining.length === 0) {
+      await this.removeManagedFilesManifest(libraryRoot);
+    } else {
+      await this.writeManagedFilesManifest(libraryRoot, remaining);
+    }
+
+    return {
+      success: failed === 0,
+      created,
+      failed,
+      errors,
+    };
+  }
+
+  private async activateGameMirrorLibrary(
+    libraryRoot: string,
+    cachePaths: SymlinkPath[]
+  ): Promise<SymlinkResult> {
+    const errors: SymlinkError[] = [];
+    let created = 0;
+    let failed = 0;
+
+    for (const item of cachePaths) {
+      const installResult = await this.installModToLibrary(libraryRoot, item);
+      created += installResult.result.created;
+      failed += installResult.result.failed;
+      errors.push(...installResult.result.errors);
     }
 
     return {
@@ -256,7 +452,9 @@ export class SymlinkService {
   }
 
   private async resolveTargetPath(modsPath: string, item: SymlinkPath): Promise<string> {
-    switch (item.installLayoutMode || 'creator-cc-folder') {
+    switch (item.installLayoutMode || 'game-mirror') {
+      case 'game-mirror':
+        return modsPath;
       case 'mods-folder':
         return modsPath;
       case 'creator-folder': {
@@ -322,23 +520,54 @@ export class SymlinkService {
     return await window.electron.ipcRenderer.invoke('path:join', basePath, ...parts);
   }
 
-  private async getManagedFilesManifestPath(modsPath: string): Promise<string> {
-    return await window.electron.ipcRenderer.invoke('path:join', modsPath, MANAGED_FILES_MANIFEST);
+  private async resolveCollisionFreeDestination(
+    destination: string,
+    sourceFile: string,
+    fileHash?: string
+  ): Promise<string> {
+    if (!(await window.electron.ipcRenderer.invoke('fs:exists', destination))) {
+      return destination;
+    }
+
+    const sourceHash =
+      fileHash || (await window.electron.ipcRenderer.invoke('crypto:hashFile', sourceFile));
+    const destinationHash = await window.electron.ipcRenderer.invoke('crypto:hashFile', destination);
+    if (sourceHash === destinationHash) {
+      return destination;
+    }
+
+    const dir = await window.electron.ipcRenderer.invoke('path:dirname', destination);
+    const base = await window.electron.ipcRenderer.invoke('path:basename', destination);
+    const dot = base.lastIndexOf('.');
+    const stem = dot >= 0 ? base.slice(0, dot) : base;
+    const ext = dot >= 0 ? base.slice(dot) : '';
+    const suffix = `__sha256-${sourceHash.slice(0, 12)}`;
+    return await window.electron.ipcRenderer.invoke('path:join', dir, `${stem}${suffix}${ext}`);
   }
 
-  private async readManagedFilesManifest(modsPath: string): Promise<ManagedFilesManifest | null> {
-    const manifestPath = await this.getManagedFilesManifestPath(modsPath);
+  private async getManagedFilesManifestPath(rootPath: string): Promise<string> {
+    return await window.electron.ipcRenderer.invoke('path:join', rootPath, MANAGED_FILES_MANIFEST);
+  }
+
+  private normalizeManifest(parsed: Partial<ManagedFilesManifest> | null): ManagedFilesManifest | null {
+    if (!parsed || !Array.isArray(parsed.entries)) {
+      return null;
+    }
+    return {
+      version: 2,
+      entries: parsed.entries,
+    };
+  }
+
+  private async readManagedFilesManifest(rootPath: string): Promise<ManagedFilesManifest | null> {
+    const manifestPath = await this.getManagedFilesManifestPath(rootPath);
     if (!(await window.electron.ipcRenderer.invoke('fs:exists', manifestPath))) {
       return null;
     }
 
     try {
       const content = await window.electron.ipcRenderer.invoke('fs:readTextFile', manifestPath);
-      const parsed = JSON.parse(content) as ManagedFilesManifest;
-      if (!Array.isArray(parsed.entries)) {
-        return null;
-      }
-      return parsed;
+      return this.normalizeManifest(JSON.parse(content) as Partial<ManagedFilesManifest>);
     } catch (error) {
       console.warn('Failed to read CC Cafe managed files manifest:', error);
       return null;
@@ -346,10 +575,10 @@ export class SymlinkService {
   }
 
   private async writeManagedFilesManifest(
-    modsPath: string,
+    rootPath: string,
     entries: ManagedPathEntry[]
   ): Promise<void> {
-    const manifestPath = await this.getManagedFilesManifestPath(modsPath);
+    const manifestPath = await this.getManagedFilesManifestPath(rootPath);
     const uniqueEntries = Array.from(
       new Map(entries.map((entry) => [entry.path, entry])).values()
     );
@@ -357,12 +586,21 @@ export class SymlinkService {
     await window.electron.ipcRenderer.invoke(
       'fs:writeFile',
       manifestPath,
-      JSON.stringify({ version: 1, entries: uniqueEntries }, null, 2)
+      JSON.stringify({ version: 2, entries: uniqueEntries }, null, 2)
     );
   }
 
-  private async removeManagedFilesManifest(modsPath: string): Promise<void> {
-    const manifestPath = await this.getManagedFilesManifestPath(modsPath);
+  private async appendManagedFilesManifest(
+    rootPath: string,
+    entries: ManagedPathEntry[]
+  ): Promise<void> {
+    const existing = await this.readManagedFilesManifest(rootPath);
+    const merged = [...(existing?.entries || []), ...entries];
+    await this.writeManagedFilesManifest(rootPath, merged);
+  }
+
+  private async removeManagedFilesManifest(rootPath: string): Promise<void> {
+    const manifestPath = await this.getManagedFilesManifestPath(rootPath);
     if (await window.electron.ipcRenderer.invoke('fs:exists', manifestPath)) {
       await window.electron.ipcRenderer.invoke('fs:remove', manifestPath);
     }

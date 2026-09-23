@@ -88,6 +88,33 @@ export function sanitizeModName(modName: string): string {
 }
 
 /**
+ * Sanitize a user-facing folder name while preserving normal spaces.
+ * This is used by the Creator / item layout so folders remain readable.
+ */
+export function sanitizeDisplayFolderName(name: string, fallback = 'Unnamed'): string {
+  if (!name || name.trim().length === 0) {
+    return fallback;
+  }
+
+  let sanitized = name
+    .replace(WINDOWS_INVALID_CHARS_REGEX, '_')
+    .replace(/[\u0000-\u001f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[. ]+$/g, '');
+
+  if (!sanitized) {
+    return fallback;
+  }
+
+  if (WINDOWS_RESERVED_NAMES.includes(sanitized.toUpperCase())) {
+    sanitized = `_${sanitized}`;
+  }
+
+  return sanitized.substring(0, MAX_FOLDER_NAME_LENGTH).replace(/[. ]+$/g, '') || fallback;
+}
+
+/**
  * Check if a string contains characters invalid for Windows paths.
  *
  * @param name - The string to check

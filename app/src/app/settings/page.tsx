@@ -21,6 +21,7 @@ import { useToast } from '@/context/ToastContext';
 import { useLanguage, type SupportedLanguage } from '@/context/LanguageContext';
 import { useTranslation } from 'react-i18next';
 import * as flags from 'country-flag-icons/react/3x2';
+import type { InstallLayoutMode } from '@/types/profile';
 
 interface Message {
   type: 'success' | 'error';
@@ -133,10 +134,14 @@ export default function SettingsPage() {
   const [fakeModDetection, setFakeModDetection] = useState(true);
   const [gameLogging, setGameLogging] = useState(true);
   const [showDebugLogs, setShowDebugLogs] = useState(false);
+  const [installLayoutMode, setInstallLayoutMode] = useState<InstallLayoutMode>('game-mirror');
   const [gamePath, setGamePath] = useState('C:\\Program Files\\EA Games\\The Sims 4\\Game\\Bin\\TS4_x64.exe');
   const [modsPath, setModsPath] = useState('C:\\Users\\Simmer\\Documents\\Electronic Arts\\The Sims 4\\Mods');
+  const [libraryRoot, setLibraryRoot] = useState('');
   const [gamePathExists, setGamePathExists] = useState(false);
   const [modsPathExists, setModsPathExists] = useState(false);
+  const [libraryRootExists, setLibraryRootExists] = useState(false);
+  const [deployingLibrary, setDeployingLibrary] = useState(false);
   const [dangerMessage, setDangerMessage] = useState<Message | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
   const [resettingDatabase, setResettingDatabase] = useState(false);
@@ -196,6 +201,10 @@ export default function SettingsPage() {
       setFakeModDetection(preferences.fakeModDetection);
       setGameLogging(preferences.gameLogging);
       setShowDebugLogs(preferences.showDebugLogs);
+      setInstallLayoutMode(preferences.installLayoutMode);
+      setLibraryRoot(preferences.libraryRoot);
+      const libraryExists = await checkPathExists(preferences.libraryRoot);
+      setLibraryRootExists(libraryExists);
 
       // Load disk performance config
       await diskPerformanceService.initialize();
@@ -292,6 +301,72 @@ export default function SettingsPage() {
       } catch (error) {
         setPathsMessage({ type: 'error', text: t('settings.game_location.failed_to_save') });
       }
+    }
+  }
+
+  async function handleLibraryRootSelect() {
+    const result = await (window as any).electron.ipcRenderer.invoke('dialog:open', {
+      properties: ['openDirectory'],
+    });
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      const path = result.filePaths[0];
+      setLibraryRoot(path);
+
+      const pathExists = await checkPathExists(path);
+      setLibraryRootExists(pathExists);
+
+      try {
+        userPreferencesService.setLibraryRoot(path);
+        const encrypted = await StorageHelper.encryptData(path);
+        StorageHelper.setLocal('cccafe_library_path', encrypted);
+        setPathsMessage({ type: 'success', text: t('settings.mod_preferences.library_root.detected') });
+        setTimeout(() => setPathsMessage(null), 5000);
+      } catch (error) {
+        setPathsMessage({ type: 'error', text: t('settings.game_location.failed_to_save') });
+      }
+    }
+  }
+
+  async function handleDeployToGame() {
+    if (!libraryRoot || !modsPath) {
+      showToast({
+        type: 'error',
+        title: t('settings.mod_preferences.deploy_to_game.failed'),
+        message: t('settings.mod_preferences.deploy_to_game.missing_paths'),
+        duration: 5000,
+      });
+      return;
+    }
+
+    setDeployingLibrary(true);
+    try {
+      const sims4Root = await (window as any).electron.ipcRenderer.invoke('path:dirname', modsPath);
+      const trayPath = await (window as any).electron.ipcRenderer.invoke('path:join', sims4Root, 'Tray');
+      const result = await (window as any).electron.ipcRenderer.invoke('library:deploy-to-game', {
+        libraryRoot,
+        modsPath,
+        trayPath,
+      });
+
+      showToast({
+        type: 'success',
+        title: t('settings.mod_preferences.deploy_to_game.title'),
+        message: t('settings.mod_preferences.deploy_to_game.success', {
+          copied: result.copied,
+          conflicts: result.conflicts,
+        }),
+        duration: 6000,
+      });
+    } catch (error: any) {
+      showToast({
+        type: 'error',
+        title: t('settings.mod_preferences.deploy_to_game.failed'),
+        message: error?.message || String(error),
+        duration: 5000,
+      });
+    } finally {
+      setDeployingLibrary(false);
     }
   }
 
@@ -759,6 +834,60 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
+                {/* Library Folder */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('settings.mod_preferences.library_root.title')}</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={libraryRoot}
+                      onChange={(e) => setLibraryRoot(e.target.value)}
+                      disabled
+                      className="w-full bg-gray-50 dark:bg-ui-input border border-gray-300 dark:border-ui-border text-gray-900 dark:text-gray-900 text-sm rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-brand-green outline-none disabled:opacity-90"
+                    />
+                    <button type="button" onClick={handleLibraryRootSelect} className="px-4 py-2 bg-gray-100 dark:bg-ui-hover border border-gray-300 dark:border-ui-border rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer">
+                      <FolderOpen size={20} />
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">{t('settings.mod_preferences.library_root.description')}</p>
+                  <div className={`mt-2 flex items-center gap-2 text-xs font-medium ${libraryRootExists ? 'text-brand-green' : 'text-amber-500'}`}>
+                    {libraryRootExists ? (
+                      <>
+                        <CheckCircle size={16} /> {t('settings.mod_preferences.library_root.detected')}
+                      </>
+                    ) : (
+                      <>
+                        <Warning size={16} /> {t('settings.mod_preferences.library_root.not_found')}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {installLayoutMode === 'game-mirror' && (
+                  <div className="rounded-lg border border-gray-200 dark:border-ui-border bg-gray-50 dark:bg-ui-input/40 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {t('settings.mod_preferences.deploy_to_game.title')}
+                        </h3>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {t('settings.mod_preferences.deploy_to_game.description')}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleDeployToGame}
+                        disabled={deployingLibrary || !libraryRootExists || !modsPathExists}
+                        className="shrink-0 rounded-lg bg-brand-green px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {deployingLibrary
+                          ? t('settings.mod_preferences.deploy_to_game.running')
+                          : t('settings.mod_preferences.deploy_to_game.button')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Message Display for Paths */}
                 {pathsMessage && (
                   <div
@@ -910,6 +1039,40 @@ export default function SettingsPage() {
                       }`}
                     />
                   </button>
+                </div>
+
+                <hr className="border-gray-200 dark:border-ui-border" />
+
+                {/* Install Layout */}
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="font-bold text-gray-900 dark:text-white">
+                      {t('settings.mod_preferences.install_layout.title')}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {t('settings.mod_preferences.install_layout.description')}
+                    </div>
+                  </div>
+
+                  <div className="inline-flex rounded-lg border border-gray-400 bg-[#e5e7eb] p-1 shadow-sm dark:border-gray-600 dark:bg-[#262626]">
+                    {(['game-mirror', 'creator-cc-folder', 'creator-folder', 'cc-folder', 'mods-folder'] as InstallLayoutMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => {
+                          setInstallLayoutMode(mode);
+                          userPreferencesService.setInstallLayoutMode(mode);
+                        }}
+                        className={`min-w-[82px] px-3 py-1.5 text-sm font-bold rounded-md transition-colors cursor-pointer ${
+                          installLayoutMode === mode
+                            ? 'bg-brand-green text-white shadow-sm ring-1 ring-black/10'
+                            : 'text-[#1f2937] hover:bg-white hover:text-black dark:text-[#f3f4f6] dark:hover:bg-white/10 dark:hover:text-white'
+                        }`}
+                      >
+                        {t(`settings.mod_preferences.install_layout.options.${mode.replace(/-/g, '_')}`)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <hr className="border-gray-200 dark:border-ui-border" />

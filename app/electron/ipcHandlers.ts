@@ -22,6 +22,7 @@ import { promisify } from 'util';
 import axios from 'axios';
 import crypto from 'crypto';
 import AdmZip from 'adm-zip';
+import { deployLibraryToGame } from './services/library/LibraryDeployService';
 
 const execAsync = promisify(exec);
 
@@ -83,9 +84,10 @@ export function registerIpcHandlers() {
       // Ensure destination directory exists
       await fs.mkdir(destDir, { recursive: true });
       
-      // Use PowerShell to extract zip on Windows
-      const command = `powershell -Command "Expand-Archive -Path '${zipPath.replace(/'/g, "''")}' -DestinationPath '${destDir.replace(/'/g, "''")}' -Force"`;
-      await execAsync(command);
+      // Use AdmZip for cross-platform extraction
+      const zip = new AdmZip(zipPath);
+      zip.extractAllTo(destDir, true);
+      
       return { success: true };
     } catch (error: any) {
       console.error('Failed to extract zip:', error);
@@ -206,6 +208,16 @@ export function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle('fs:copyFile', async (_, src: string, dest: string) => {
+    try {
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      await fs.copyFile(src, dest);
+      return true;
+    } catch (error: any) {
+      throw new Error(`Failed to copy file: ${error.message}`);
+    }
+  });
+
   // --- Crypto Handlers ---
   ipcMain.handle('crypto:hashFile', async (_, filePath: string) => {
     try {
@@ -288,6 +300,10 @@ export function registerIpcHandlers() {
     return path.join(...args);
   });
 
+  ipcMain.handle('path:dirname', async (_, targetPath: string) => {
+    return path.dirname(targetPath);
+  });
+
   ipcMain.handle('path:basename', async (_, filePath: string) => {
     return path.basename(filePath);
   });
@@ -299,6 +315,16 @@ export function registerIpcHandlers() {
   ipcMain.handle('path:documentDir', async () => {
     return app.getPath('documents');
   });
+
+  ipcMain.handle(
+    'library:deploy-to-game',
+    async (
+      _,
+      request: { libraryRoot: string; modsPath: string; trayPath: string }
+    ) => {
+      return deployLibraryToGame(request);
+    }
+  );
 
   // --- Dialog Handlers ---
   ipcMain.handle('dialog:open', async (_, options: any) => {
@@ -338,14 +364,17 @@ export function registerIpcHandlers() {
   // --- App Handlers ---
   ipcMain.handle('app:getVersion', async () => {
     // Prefer package.json version so title/splash always match the bumped build.
-    return app.getVersion() || '0.6.2';
+    return app.getVersion() || '0.6.4';
   });
 
   ipcMain.handle('app:getBuildInfo', async () => {
+    const version = app.getVersion() || '0.6.4';
+    const buildCode = 'S4MM-UI-5';
+
     return {
-      version: app.getVersion() || '0.6.2',
-      buildCode: 'S4MM-UI-3',
-      label: `v${app.getVersion() || '0.6.2'} (S4MM-UI-3)`,
+      version,
+      buildCode,
+      label: `v${version} (${buildCode})`,
     };
   });
 
@@ -714,6 +743,33 @@ export function registerIpcHandlers() {
   ipcMain.handle('s4mm:objectviewer-texture', async (_event, { filePath, address }) => {
     try {
       return await objectViewerService.extractTexture(filePath, address);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Object viewer: animation clips in a package */
+  ipcMain.handle('s4mm:objectviewer-clips', async (_event, { filePath }) => {
+    try {
+      return objectViewerService.listClips(filePath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Object viewer: adult Sim body meshes used to display a clip */
+  ipcMain.handle('s4mm:objectviewer-body', async (_event, { gamePath }) => {
+    try {
+      return await objectViewerService.getBodyParts(gamePath);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  /** Object viewer: one clip plus the best matching game rig */
+  ipcMain.handle('s4mm:objectviewer-clip', async (_event, { filePath, address, gamePath }) => {
+    try {
+      return await objectViewerService.getClip(filePath, address, gamePath);
     } catch (error: any) {
       return { success: false, error: error.message };
     }

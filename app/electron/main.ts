@@ -3,11 +3,14 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { pathToFileURL } from 'url';
 import { isDev } from './utils';
-import { registerIpcHandlers } from './ipcHandlers';
 
 let mainWindow: BrowserWindow | null = null;
+let ipcHandlersRegistered = false;
 
 const OUT_DIR = path.join(app.getAppPath(), 'out');
+const logStartup = (...args: unknown[]) => {
+  console.log('[Main]', ...args);
+};
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
@@ -110,12 +113,20 @@ function registerAppProtocol() {
 }
 
 function createWindow() {
+  logStartup('Creating window', {
+    appPath: app.getAppPath(),
+    outDir: OUT_DIR,
+    icon: path.join(OUT_DIR, 'cccafe.png'),
+    packaged: app.isPackaged,
+  });
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 720,
     minWidth: 960,
     minHeight: 640,
     resizable: true,
+    icon: path.join(OUT_DIR, 'cccafe.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -123,18 +134,44 @@ function createWindow() {
     },
   });
 
-  // Register IPC handlers
-  registerIpcHandlers();
+  if (!ipcHandlersRegistered) {
+    try {
+      const { registerIpcHandlers } = require('./ipcHandlers') as typeof import('./ipcHandlers');
+      registerIpcHandlers();
+      ipcHandlersRegistered = true;
+      logStartup('IPC handlers registered');
+    } catch (error) {
+      console.error('[Main] Failed to register IPC handlers', error);
+      throw error;
+    }
+  }
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error('[Main] Window failed to load', { errorCode, errorDescription, validatedURL });
+  });
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[Main] Renderer process gone', details);
+  });
+
+  mainWindow.webContents.on('unresponsive', () => {
+    console.warn('[Main] Window became unresponsive');
+  });
 
   if (isDev()) {
-    mainWindow.loadURL('http://localhost:3000/splash');
+    void mainWindow.loadURL('http://localhost:3000/splash').catch((error) => {
+      console.error('[Main] Failed to load dev URL', error);
+    });
     mainWindow.webContents.openDevTools();
   } else {
     // Start on the splash screen, then it redirects into the app.
-    mainWindow.loadURL('app://app/splash');
+    void mainWindow.loadURL('app://app/splash').catch((error) => {
+      console.error('[Main] Failed to load packaged URL', error);
+    });
   }
 
   mainWindow.on('closed', () => {
+    logStartup('Window closed');
     mainWindow = null;
   });
 }
@@ -145,6 +182,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.on('ready', () => {
+  logStartup('App ready');
   if (!isDev()) {
     registerAppProtocol();
   }
@@ -152,9 +190,18 @@ app.on('ready', () => {
 });
 
 app.on('window-all-closed', () => {
+  logStartup('All windows closed');
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', () => {
+  logStartup('Before quit');
+});
+
+app.on('will-quit', () => {
+  logStartup('Will quit');
 });
 
 app.on('activate', () => {

@@ -41,6 +41,26 @@ interface CachedSearchResult {
 
 const SEARCH_CACHE_PREFIX = 'cccafe_modlist_cache:';
 const SEARCH_CACHE_TTL = 1000 * 60 * 10;
+const PAGE_SIZE = 50;
+
+function uniqueModsById(items: CurseForgeMod[]) {
+  const seen = new Set<number>();
+  return items.filter((mod) => {
+    if (seen.has(mod.id)) return false;
+    seen.add(mod.id);
+    return true;
+  });
+}
+
+function appendUniqueMods(existing: CurseForgeMod[], incoming: CurseForgeMod[]) {
+  const seen = new Set(existing.map((mod) => mod.id));
+  const uniqueIncoming = incoming.filter((mod) => {
+    if (seen.has(mod.id)) return false;
+    seen.add(mod.id);
+    return true;
+  });
+  return [...existing, ...uniqueIncoming];
+}
 
 export default function ModList({ searchQuery, sortBy, category, authorId, viewMode, activeFilter = 'all', scrollIndex = 0 }: ModListProps) {
   const { t } = useTranslation();
@@ -52,11 +72,12 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
   const [warningStatuses, setWarningStatuses] = useState<Record<number, ModWarningStatus>>({});
   const [pagination, setPagination] = useState<PaginationState>({
     index: 0,
-    pageSize: 50,
+    pageSize: PAGE_SIZE,
     resultCount: 0,
     totalCount: 0,
   });
   const [hasMore, setHasMore] = useState(true);
+  const [isCacheFallback, setIsCacheFallback] = useState(false);
   const [gridColumns, setGridColumns] = useState(8);
   const paginationRef = useRef<PaginationState>(pagination);
   const listRef = useRef<any>(null);
@@ -64,6 +85,7 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   const hasRestoredScroll = useRef(false);
   const isRestoring = useRef(false);
+  const loadMoreInFlightRef = useRef(false);
   const scrollUpdateTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const normalizedCategory = category ?? '';
@@ -84,11 +106,11 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
       const width = window.innerWidth;
       if (width < 700) setGridColumns(3);
       else if (width < 900) setGridColumns(5);
-      else if (width < 1100) setGridColumns(7);
-      else if (width < 1300) setGridColumns(8);
-      else if (width < 1500) setGridColumns(9);
-      else if (width < 1700) setGridColumns(10);
-      else setGridColumns(11);
+      else if (width < 1100) setGridColumns(8);
+      else if (width < 1300) setGridColumns(9);
+      else if (width < 1500) setGridColumns(10);
+      else if (width < 1700) setGridColumns(11);
+      else setGridColumns(12);
     };
 
     updateGridColumns();
@@ -169,7 +191,7 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
 
     const apiParams = {
       query: searchQuery || undefined,
-      pageSize: 100,
+      pageSize: PAGE_SIZE,
       pageIndex,
       sortBy: apiSortBy as 'downloads' | 'date' | 'popularity' | 'relevance',
       categoryName: normalizedCategory || undefined,
@@ -179,24 +201,26 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
     try {
       const result = await searchCurseForgeMods(apiParams);
 
-      setMods((prev) => (pageIndex === 0 ? result.mods : [...prev, ...result.mods]));
+      const uniquePageMods = uniqueModsById(result.mods);
+      setMods((prev) => (pageIndex === 0 ? uniquePageMods : appendUniqueMods(prev, uniquePageMods)));
+      setIsCacheFallback(result.source === 'cache');
 
       const nextPagination = {
         index: pageIndex,
-        pageSize: 100,
-        resultCount: result.pagination.resultCount,
+        pageSize: PAGE_SIZE,
+        resultCount: uniquePageMods.length,
         totalCount: result.pagination.totalCount,
       };
 
       setPagination(nextPagination);
 
       // Check if there are more pages
-      const loadedCount = (pageIndex + 1) * 100;
+      const loadedCount = (pageIndex + 1) * PAGE_SIZE;
       const nextHasMore = loadedCount < result.pagination.totalCount && result.mods.length > 0;
       setHasMore(nextHasMore);
 
       if (pageIndex === 0) {
-        saveCachedSearchResult(searchCacheKey, result.mods, nextPagination, nextHasMore);
+        saveCachedSearchResult(searchCacheKey, uniquePageMods, nextPagination, nextHasMore);
       }
     } catch (err: any) {
       const errorMessage = err.response?.data?.error?.message || err.message || 'Failed to load mods';
@@ -232,12 +256,13 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
     setWarningStatuses({});
     setPagination({
       index: 0,
-      pageSize: 100,
+      pageSize: PAGE_SIZE,
       resultCount: 0,
       totalCount: 0,
     });
     setError(null);
     setHasMore(true);
+    setIsCacheFallback(false);
 
     // Only reset scroll position when filters ACTUALLY changed (not on mount/remount)
     // This preserves scroll position when navigating back
@@ -253,9 +278,11 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
 
     const cached = readCachedSearchResult(searchCacheKey);
     if (cached) {
-      setMods(cached.mods);
+      const uniqueCachedMods = uniqueModsById(cached.mods);
+      setMods(uniqueCachedMods);
       setPagination(cached.pagination);
       setHasMore(cached.hasMore);
+      setIsCacheFallback(false);
       setError(null);
       setIsLoading(false);
       return;
@@ -295,11 +322,16 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
   }, [mods]);
 
   const loadNextPage = useCallback(() => {
-    if (!hasMore || isLoadingMore || isLoading) return;
+    if (!hasMore || isLoadingMore || isLoading || loadMoreInFlightRef.current) return;
     const nextPageIndex = paginationRef.current.index + 1;
-    fetchModsForPage(nextPageIndex).catch(() => {
-      setError('Failed to load more mods');
-    });
+    loadMoreInFlightRef.current = true;
+    fetchModsForPage(nextPageIndex)
+      .catch(() => {
+        setError('Failed to load more mods');
+      })
+      .finally(() => {
+        loadMoreInFlightRef.current = false;
+      });
   }, [hasMore, isLoadingMore, isLoading, fetchModsForPage]);
 
   /**
@@ -344,12 +376,12 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
           loadNextPage();
         }
       },
-      { root, rootMargin: '400px 0px', threshold: 0 }
+      { root, rootMargin: '160px 0px', threshold: 0 }
     );
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [viewMode, loadNextPage, mods.length]);
+  }, [viewMode, loadNextPage]);
 
   /** Keep fetching while the grid content is shorter than the viewport. */
   useEffect(() => {
@@ -361,18 +393,6 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
       loadNextPage();
     }
   }, [viewMode, hasMore, isLoadingMore, isLoading, mods.length, loadNextPage]);
-
-  const handleGridScroll = useCallback(() => {
-    if (isRestoring.current) return;
-    const root = gridScrollRef.current;
-    if (!root) return;
-    if (scrollUpdateTimeout.current) clearTimeout(scrollUpdateTimeout.current);
-    scrollUpdateTimeout.current = setTimeout(() => {
-      // Approximate card index from scroll position for back-navigation restore.
-      const approxRow = Math.floor(root.scrollTop / 160);
-      setScrollIndex(approxRow * gridColumns);
-    }, 150);
-  }, [gridColumns, setScrollIndex]);
 
   const handleRangeChanged = useCallback(
     (range: any) => {
@@ -428,6 +448,7 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
       9: 'grid-cols-9',
       10: 'grid-cols-10',
       11: 'grid-cols-11',
+      12: 'grid-cols-12',
     }[gridColumns] || 'grid-cols-8';
 
   return (
@@ -467,11 +488,10 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
         ) : (
           <div
             ref={gridScrollRef}
-            onScroll={handleGridScroll}
             className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-8 pt-2 lg:px-8"
             style={{ overscrollBehavior: 'contain' }}
           >
-            <div className={`grid ${gridColsClass} gap-x-3 gap-y-4`}>
+            <div className={`grid ${gridColsClass} gap-x-2.5 gap-y-3.5`}>
               {mods.map((mod) => (
                 <ModCard key={mod.id} mod={mod} warningStatus={warningStatuses[mod.id]} />
               ))}
@@ -481,7 +501,9 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
               <div className="py-4 text-center text-xs text-neutral-400">Loading more…</div>
             )}
             {!hasMore && mods.length > 0 && (
-              <div className="py-4 text-center text-xs text-neutral-500">End of results</div>
+              <div className="py-4 text-center text-xs text-neutral-500">
+                {isCacheFallback ? 'End of cached results' : 'End of results'}
+              </div>
             )}
           </div>
         )
@@ -495,4 +517,3 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
     </div>
   );
 }
-

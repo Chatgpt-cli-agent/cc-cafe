@@ -219,9 +219,12 @@
           "mods_folder": "Mods folder",
           "creator_folder": "Creator folder",
           "creator_cc_folder": "Creator / item",
-          "cc_folder": "CC folder"
+          "cc_folder": "CC folder",
+          "game_mirror": "Game mirror"
         }
       },
+      "library_root": { "title": "Library folder", "description": "Stores downloaded content in CC Cafe Library under your Documents folder by default. Use the folder picker to choose another location.", "detected": "Library folder found", "not_found": "Library folder not found" },
+      "deploy_to_game": { "title": "Deploy library to game", "description": "Copy CC, Tray, and Gameplay Mods from the library into your game folders without overwriting existing files.", "button": "Deploy to game", "running": "Deploying...", "success": "Deployed {{copied}} file(s). {{conflicts}} existing file(s) were left unchanged.", "failed": "Deploy failed", "missing_paths": "Configure both the library folder and mods folder before deploying." },
       "fake_detection": {
         "title": "Detección de mods falsos",
         "description": "Muestra advertencias y bloquea creadores vetados cuando se detectan mods sospechosos."
@@ -652,6 +655,7 @@
       "failed_to_activate": "No se pudo activar el perfil",
       "still_initializing": "El sistema de perfiles se está inicializando. Por favor, espera un momento e inténtalo de nuevo.",
       "mods_path_not_configured": "Ruta de mods no configurada. No se pudo encontrar la instalación de The Sims 4.",
+      "library_path_not_configured": "Library folder not configured. Set it in Settings before activating a profile in game-mirror mode.",
       "profile_not_found": "Perfil no encontrado",
       "failed_to_create_symlinks": "Fallo al crear {{count}} enlaces simbólicos:\n{{errors}}\n\nComprueba los permisos y que The Sims 4 no se esté ejecutando.",
       "mod_removed": "Mod eliminado",

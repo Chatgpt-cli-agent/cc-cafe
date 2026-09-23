@@ -23,7 +23,24 @@ export interface ProfileMod {
   logo?: string;
   authors?: string[];
   lastUpdateDate?: string;
+  libraryPaths?: string[];
+  /**
+   * Content category. 'save' marks archives that contain Sims 4 save files
+   * (installed into the game's Saves folder, never symlinked or mirrored).
+   * Defaults to 'mod' when absent.
+   */
+  contentKind?: 'mod' | 'save';
 }
+
+/**
+ * How profile mod files are laid out inside The Sims 4 Mods folder.
+ */
+export type InstallLayoutMode =
+  | 'mods-folder'
+  | 'creator-folder'
+  | 'cc-folder'
+  | 'creator-cc-folder'
+  | 'game-mirror';
 
 /**
  * A complete mod profile with list of mods and metadata
@@ -105,6 +122,7 @@ export interface SymlinkResult {
 export interface Sims4Paths {
   gamePath: string | null;
   modsPath: string | null;
+  libraryRoot: string | null;
 }
 
 /**

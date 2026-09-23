@@ -5,12 +5,15 @@
  */
 
 import { getModDownloadUrl, getCurseForgeMod } from '@/lib/curseforgeApi';
-import { modCacheService } from './ModCacheService';
+import { modCacheService, isSaveFileName } from './ModCacheService';
 import { profileService } from './ProfileService';
 import { symlinkService } from './SymlinkService';
 import { fakeScoreService } from './FakeScoreService';
+import { userPreferencesService } from './UserPreferencesService';
+import { installCachedModToLibrary } from './LibraryInstallService';
+import { saveInstallService } from './SaveInstallService';
 import { sanitizeModName } from '@/utils/pathSanitizer';
-import type { ProfileMod } from '@/types/profile';
+import type { ProfileMod, CachedModFile } from '@/types/profile';
 import type { FakeScoreResult, ZipAnalysis } from '@/types/fakeDetection';
 
 /**
@@ -228,6 +231,10 @@ export class ModInstallationService {
         activeProfile.id
       );
 
+      const saveFiles = cachedMod.files.filter((f) => isSaveFileName(f.fileName));
+      const modFiles = cachedMod.files.filter((f) => !isSaveFileName(f.fileName));
+      const hasSaveContent = saveFiles.length > 0;
+
       // Add mod to active profile
       const profileMod: ProfileMod = {
         modId,
@@ -242,44 +249,84 @@ export class ModInstallationService {
         logo: modLogo,
         authors: modAuthors,
         lastUpdateDate,
+        contentKind: hasSaveContent ? 'save' : 'mod',
       };
 
       await profileService.addModToProfile(activeProfile.id, profileMod);
 
-      // If modsPath is provided, activate all profile mods (not just the new one)
+      await userPreferencesService.initialize();
+      const installLayoutMode = userPreferencesService.getInstallLayoutMode();
+      const existingMod = activeProfile.mods.find((mod) => mod.modId === modId);
       let installedFiles: string[] = [];
-      if (modsPath && (await window.electron.ipcRenderer.invoke('fs:exists', modsPath))) {
+      let libraryPaths: string[] = [];
+
+      if (hasSaveContent) {
+        onProgress?.({
+          stage: 'installing',
+          percent: 82,
+          message: 'Installing save file(s) into your Saves folder...',
+        });
+
+        const cachePath = await modCacheService.getCachePath(cachedMod.fileHash);
+        const saveResult = await saveInstallService.installSavesFromCache(cachePath, saveFiles);
+        installedFiles = saveResult.installed;
+      }
+      installedFiles.push(...modFiles.map((f: CachedModFile) => f.fileName));
+
+      if (modFiles.length > 0 && installLayoutMode === 'game-mirror') {
+        onProgress?.({
+          stage: 'installing',
+          percent: 85,
+          message: existingMod ? 'Updating mod in library...' : 'Installing mod into library...',
+        });
+
+        libraryPaths = await installCachedModToLibrary(profileMod, { ...cachedMod, files: modFiles }, {
+          creatorName: modAuthors?.[0],
+          action: existingMod ? 'update' : 'install',
+        });
+        profileMod.libraryPaths = libraryPaths;
+        await profileService.addModToProfile(activeProfile.id, profileMod);
+      } else if (
+        modFiles.length > 0 &&
+        modsPath &&
+        (await window.electron.ipcRenderer.invoke('fs:exists', modsPath))
+      ) {
         onProgress?.({
           stage: 'installing',
           percent: 85,
           message: 'Creating symlinks to profile mods...',
         });
 
-        // Get the updated profile with all mods
         const updatedProfile = await profileService.getProfile(activeProfile.id);
         if (!updatedProfile) {
           throw new Error('Failed to retrieve updated profile');
         }
 
-        // Build cache paths for ALL mods in the profile
-        const allModPaths: { source: string; modName: string }[] = [];
+        const allModPaths: Parameters<typeof symlinkService.activateProfile>[1] = [];
         for (const mod of updatedProfile.mods) {
+          if (mod.contentKind === 'save') {
+            continue;
+          }
           const cachePath = await modCacheService.getCachePath(mod.fileHash);
+          const cachedProfileMod = await modCacheService.getCachedMod(mod.fileHash);
           const sanitizedModName = sanitizeModName(mod.modName);
-          allModPaths.push({ source: cachePath, modName: sanitizedModName });
+          const files = cachedProfileMod?.files.filter((f) => !isSaveFileName(f.fileName));
+          allModPaths.push({
+            source: cachePath,
+            modName: sanitizedModName,
+            creatorName: mod.authors?.[0],
+            installLayoutMode,
+            files,
+            modId: mod.modId,
+            fileHash: mod.fileHash,
+          });
         }
 
         const symlinkResult = await symlinkService.activateProfile(modsPath, allModPaths);
 
         if (!symlinkResult.success) {
           console.warn('Failed to create symlinks:', symlinkResult.errors);
-          // Don't fail - mods are in cache and profile
         }
-
-        installedFiles = cachedMod.files.map((f: any) => f.fileName);
-      } else {
-        // If modsPath not provided, just return the cached files
-        installedFiles = cachedMod.files.map((f: any) => f.fileName);
       }
 
       await this.cleanupTempDir(tempDir);

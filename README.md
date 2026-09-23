@@ -2,6 +2,10 @@
 
 CC Café is an open-source Sims 4 mod manager built as a monolithic Electron + Next.js desktop app.
 
+New installations use `CC Cafe Library` inside the current user's Documents folder. The obsolete JDownloader default migrates automatically; explicitly selected library folders are preserved. Use the folder picker in Settings to choose another mounted drive. The library stores downloaded content; deployment to the game's Mods and Tray folders is a separate operation.
+
+CurseForge "Save Files" downloads (e.g. "Ultimate Saves") are installed into `Documents/Electronic Arts/The Sims 4/saves`, flattened to the folder root as the game requires. Any existing file at a target slot is renamed aside (`.cc-cafe-backup-<timestamp>`) before the new save is copied in, never deleted. Save packages are tracked in your profile like mods but are never symlinked or mirrored into the Mods folder or the library.
+
 ## What It Does
 
 - CurseForge browse, creators, downloads, and updates
@@ -10,7 +14,7 @@ CC Café is an open-source Sims 4 mod manager built as a monolithic Electron + N
 - Local mod import (.package, .ts4script, .zip, .rar) and profile management
 - Fake mod detection and reporting
 - S4MM-style tools for duplicate scans, CC package analysis, ID conflict checks, polygon scans, empty folder cleanup, and pack disable commands
-- S4MM 2.0 tool ports: CurseForge fingerprint matching, 3D CAS viewer, HQ texture scan, merged package extraction, loading screen and main menu creators, TGI checker, region map checker, and save file reader
+- S4MM 2.0 tool ports: CurseForge fingerprint matching, 3D CAS viewer (meshes and animation clips), HQ texture scan, merged package extraction, loading screen and main menu creators, TGI checker, region map checker, and save file reader
 - Sims Log Enabler installation and game log viewing
 - Resizable desktop window
 
@@ -81,4 +85,4 @@ npm run release
 ## Notes
 
 - The top-level `updates/` folder is kept for release artifacts and manifest output.
-
+- CC Café does not register or handle The Sims Resource's `tsrcc:` links. Those links remain owned by TSR CC Manager.

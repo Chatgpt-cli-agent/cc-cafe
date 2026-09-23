@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Check, DownloadSimple, Spinner } from '@phosphor-icons/react';
@@ -33,7 +33,7 @@ interface ModCardProps {
  * Dense S4MM-style grid tile.
  * Primary click opens the mod detail; install is available via the hover action.
  */
-export default function ModCard({ mod, warningStatus }: ModCardProps) {
+function ModCard({ mod, warningStatus }: ModCardProps) {
   const { t } = useTranslation();
   const { showToast, updateToast } = useToast();
   const { refreshProfiles, activeProfile } = useProfiles();
@@ -308,3 +308,5 @@ export default function ModCard({ mod, warningStatus }: ModCardProps) {
     </>
   );
 }
+
+export default memo(ModCard);

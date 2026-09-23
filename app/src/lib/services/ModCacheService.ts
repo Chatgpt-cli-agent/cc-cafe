@@ -14,6 +14,21 @@ import { diskPerformanceService } from './DiskPerformanceService';
 import { concurrentMap } from '@/lib/utils/concurrencyPool';
 import { resolveAppDataPath } from './AppPaths';
 
+/**
+ * Sims 4 save files live loose in the game's Saves folder root as
+ * `Slot_XXXXXXXX.save`, alongside rotating backups
+ * `Slot_XXXXXXXX.save.ver0`–`Slot_XXXXXXXX.save.ver4`.
+ */
+const SAVE_BACKUP_PATTERN = /\.save\.ver\d+$/i;
+
+export function isSaveFileName(fileName: string): boolean {
+  const lower = fileName.toLowerCase();
+  if (SAVE_BACKUP_PATTERN.test(lower)) {
+    return true;
+  }
+  return lower.endsWith('.save');
+}
+
 export class ModCacheService {
   private cacheDir: string | null = null;
   private indexFile: string | null = null;
@@ -65,7 +80,17 @@ export class ModCacheService {
 
     // Check if already cached
     const index = await this.getIndex();
-    let cachedMod = index.entries[fileHash];
+    let cachedMod: CachedMod | undefined = index.entries[fileHash];
+
+    // Older Linux builds could record a failed ZIP extraction as a cache hit
+    // with no files. Invalidate those entries so retrying performs a real
+    // download/extraction instead of recreating an empty creator folder.
+    if (cachedMod && cachedMod.files.length === 0) {
+      await this.deleteCacheEntry(fileHash);
+      delete index.entries[fileHash];
+      await this.saveIndex(index);
+      cachedMod = undefined;
+    }
 
     if (cachedMod) {
       // File already cached - add profile to usage tracking
@@ -82,11 +107,17 @@ export class ModCacheService {
     const cacheFilesDir = await window.electron.ipcRenderer.invoke('path:join', cacheEntryDir, 'files');
     await window.electron.ipcRenderer.invoke('fs:mkdir', cacheFilesDir, { recursive: true });
 
-    // Extract mod to cache directory
-    const extractedFiles = await this.extractModToCache(
-      sourcePath,
-      cacheFilesDir
-    );
+    // Extract mod to cache directory. Keep cache creation transactional so a
+    // failed extractor cannot leave an empty entry that later looks installed.
+    let extractedFiles: CachedModFile[];
+    try {
+      extractedFiles = await this.extractModToCache(sourcePath, cacheFilesDir);
+    } catch (error) {
+      await window.electron.ipcRenderer.invoke('fs:remove', cacheEntryDir, {
+        recursive: true,
+      });
+      throw error;
+    }
 
     // Get file size
     const fileSize = await this.getFileSize(sourcePath);
@@ -318,19 +349,25 @@ export class ModCacheService {
   ): Promise<CachedModFile[]> {
     // Extract ZIP to cache directory
     try {
-      await window.electron.ipcRenderer.invoke('extract-zip', {
+      const extraction = await window.electron.ipcRenderer.invoke('extract-zip', {
         zipPath: sourcePath,
         destDir,
       });
+      if (extraction?.success === false) {
+        throw new Error(extraction.error || 'ZIP extraction failed');
+      }
     } catch (error) {
       console.error('Failed to extract zip:', error);
       throw new Error(`Failed to extract mod: ${error}`);
     }
 
-    // Find all .package files
-    const packageFiles = await this.findPackageFiles(destDir);
+    // Find all Sims content files
+    const simsFiles = await this.findSimsFiles(destDir);
+    if (simsFiles.length === 0) {
+      throw new Error('Archive contains no supported Sims 4 content files');
+    }
 
-    return packageFiles.map((filePath) => {
+    return simsFiles.map((filePath) => {
       // Calculate relative path from destDir
       const relativePath = filePath
         .substring(destDir.length)
@@ -345,19 +382,37 @@ export class ModCacheService {
     });
   }
 
-  private async findPackageFiles(dir: string): Promise<string[]> {
+  private async findSimsFiles(dir: string): Promise<string[]> {
     const results: string[] = [];
+    const simsExtensions = [
+      '.package',
+      '.ts4script',
+      '.blueprint',
+      '.bpi',
+      '.hhi',
+      '.householdbinary',
+      '.rmi',
+      '.room',
+      '.sgi',
+      '.trayitem',
+      '.cfg',
+      '.ini',
+    ];
 
     try {
       const entries = await window.electron.ipcRenderer.invoke('fs:readDir', dir);
 
       for (const entry of entries) {
         const fullPath = await window.electron.ipcRenderer.invoke('path:join', dir, entry.name);
+        const lowerName = entry.name.toLowerCase();
 
         if (entry.isDirectory) {
-          const subResults = await this.findPackageFiles(fullPath);
+          const subResults = await this.findSimsFiles(fullPath);
           results.push(...subResults);
-        } else if (entry.name.endsWith('.package')) {
+        } else if (
+          simsExtensions.some((extension) => lowerName.endsWith(extension)) ||
+          isSaveFileName(entry.name)
+        ) {
           results.push(fullPath);
         }
       }
@@ -366,6 +421,11 @@ export class ModCacheService {
     }
 
     return results;
+  }
+
+  private async findPackageFiles(dir: string): Promise<string[]> {
+    const files = await this.findSimsFiles(dir);
+    return files.filter((filePath) => filePath.toLowerCase().endsWith('.package'));
   }
 
   private async deleteCacheEntry(fileHash: string): Promise<void> {

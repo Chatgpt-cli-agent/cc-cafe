@@ -6,9 +6,11 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { modCacheService } from './ModCacheService';
+import { modCacheService, isSaveFileName } from './ModCacheService';
 import { profileService } from './ProfileService';
 import { fakeScoreService } from './FakeScoreService';
+import { installCachedModToLibrary } from './LibraryInstallService';
+import { saveInstallService } from './SaveInstallService';
 import { resolveAppDataPath } from './AppPaths';
 import type { ProfileMod } from '@/types/profile';
 import type { FakeScoreResult, ZipAnalysis } from '@/types/fakeDetection';
@@ -245,6 +247,9 @@ export class LocalModImportService {
         profileId
       );
 
+      const saveFiles = cachedMod.files.filter((f) => isSaveFileName(f.fileName));
+      const hasSaveContent = saveFiles.length > 0;
+
       // Create ProfileMod entry
       const profileMod: ProfileMod = {
         localModId,
@@ -255,10 +260,24 @@ export class LocalModImportService {
         installDate: new Date().toISOString(),
         enabled: true,
         cacheLocation: cachedMod.fileHash,
+        contentKind: hasSaveContent ? 'save' : 'mod',
       };
 
       // Add to profile
       await profileService.addModToProfile(profileId, profileMod);
+
+      if (hasSaveContent) {
+        const cachePath = await modCacheService.getCachePath(cachedMod.fileHash);
+        await saveInstallService.installSavesFromCache(cachePath, saveFiles);
+      }
+
+      const cachedModForInstall = await modCacheService.getCachedMod(cachedMod.fileHash);
+      if (cachedModForInstall && !hasSaveContent) {
+        profileMod.libraryPaths = await installCachedModToLibrary(profileMod, cachedModForInstall, {
+          creatorName: modName,
+        });
+        await profileService.addModToProfile(profileId, profileMod);
+      }
 
       // Cleanup temp
       await this.cleanupTemp(tempDir);

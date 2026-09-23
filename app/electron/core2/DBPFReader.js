@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CASPMapper = exports.MixedHelpers = exports.PosePack = exports.PosePackHelper = exports.ThumCacheEntry = exports.ThumCacheTable = exports.MTSTFile = exports.MTRLFile = exports.MATDFile = exports.MeshFile = exports.MLODFile = exports.MODLFile = exports.VBUFFile = exports.IBUFFile = exports.VRTFFile = exports.ChunkEntry = exports.ChunkEntryList = exports.GenericRCOLFile = exports.XMLResource = exports.XMLFile = exports.S4SMMFile = exports.GameFiles = exports.STBLFile = exports.GEOMResource = exports.ZoneObjItem = exports.ZoneObjFile = exports.GEOMFile = exports.RMAPFile = exports.CLIPResource = exports.COBJResource = exports.COBJFile = exports.OBJDFile = exports.CASPResource = exports.CASPFile = exports.LRLEFile = exports.REL2File = exports.CompressUtil = exports.Basic = exports.PackHandler = exports.BinaryWritter = exports.BufferOperations = exports.ByteBuffer = exports.SimsPatterns = exports.TrayFiles = exports.IndexEnty = exports.SaveFile = exports.ModelGroup = exports.COBJPack = exports.ImportInfoPack = exports.Pack = void 0;
+exports.CASPMapper = exports.MixedHelpers = exports.PosePack = exports.PosePackHelper = exports.ThumCacheEntry = exports.ThumCacheTable = exports.MTSTFile = exports.MTRLFile = exports.MATDFile = exports.MeshFile = exports.MLODFile = exports.MODLFile = exports.VBUFFile = exports.IBUFFile = exports.VRTFFile = exports.ChunkEntry = exports.ChunkEntryList = exports.GenericRCOLFile = exports.XMLResource = exports.XMLFile = exports.S4SMMFile = exports.GameFiles = exports.STBLFile = exports.GEOMResource = exports.ZoneObjItem = exports.ZoneObjFile = exports.GEOMFile = exports.RMAPFile = exports.CLIPFile = exports.RIGFile = exports.CLIPResource = exports.COBJResource = exports.COBJFile = exports.OBJDFile = exports.CASPResource = exports.CASPFile = exports.LRLEFile = exports.REL2File = exports.CompressUtil = exports.Basic = exports.PackHandler = exports.BinaryWritter = exports.BufferOperations = exports.ByteBuffer = exports.SimsPatterns = exports.TrayFiles = exports.IndexEnty = exports.SaveFile = exports.ModelGroup = exports.COBJPack = exports.ImportInfoPack = exports.Pack = void 0;
 exports.SimsHashes = exports.Helper = exports.TagType = exports.BodyType = exports.COBJMapper = void 0;
 var fs = require('fs');
 var zlib = require("zlib");
@@ -2084,6 +2084,9 @@ class IndexEnty {
         }
         else if (this.r_type == 0xC5F6763E) {
             this.type = TagType.SMOD;
+        }
+        else if (this.r_type == 0x8EAF13DE) {
+            this.type = TagType.RIG;
         }
         else {
             this.type = TagType.OTHER;
@@ -5812,6 +5815,274 @@ class CLIPResource {
     }
 }
 exports.CLIPResource = CLIPResource;
+//Skeleton (0x8EAF13DE) in the "clear" layout (see s4pe RigResource.ParseClear), granny rigs are not supported
+class RIGFile {
+    constructor(buffer) {
+        this.error = false;
+        this.major = 0;
+        this.minor = 0;
+        this.name = "";
+        this.bones = [];
+        try {
+            this.parse(buffer);
+        }
+        catch (error) {
+            this.error = true;
+        }
+    }
+    parse(b) {
+        let o = 0;
+        this.major = b.readUInt32LE(o);
+        o += 4;
+        this.minor = b.readUInt32LE(o);
+        o += 4;
+        if (!(this.major == 3 || this.major == 4) || !(this.minor == 1 || this.minor == 2)) {
+            this.error = true;
+            return;
+        }
+        let count = b.readUInt32LE(o);
+        o += 4;
+        for (let i = 0; i < count; i++) {
+            let position = [b.readFloatLE(o), b.readFloatLE(o + 4), b.readFloatLE(o + 8)];
+            o += 12;
+            let orientation = [b.readFloatLE(o), b.readFloatLE(o + 4), b.readFloatLE(o + 8), b.readFloatLE(o + 12)];
+            o += 16;
+            let scale = [b.readFloatLE(o), b.readFloatLE(o + 4), b.readFloatLE(o + 8)];
+            o += 12;
+            let nameLength = b.readUInt32LE(o);
+            o += 4;
+            let name = b.subarray(o, o + nameLength).toString("latin1");
+            o += nameLength;
+            let opposing = b.readInt32LE(o);
+            o += 4;
+            let parent = b.readInt32LE(o);
+            o += 4;
+            let hash = b.readUInt32LE(o);
+            o += 4;
+            let flags = b.readUInt32LE(o);
+            o += 4;
+            this.bones.push({ name, hash, parent, opposing, flags, position, orientation, scale });
+        }
+        //Skeleton name (empty for most TS4 rigs), IK chains follow and are not needed
+        if (o + 4 <= b.length) {
+            let nameLength = b.readUInt32LE(o);
+            o += 4;
+            if (nameLength > 0 && o + nameLength <= b.length)
+                this.name = b.subarray(o, o + nameLength).toString("latin1");
+        }
+    }
+    boneHashes() {
+        return new Set(this.bones.map(bone => bone.hash));
+    }
+    //Bind pose position of a bone (case insensitive name) in rig space, [0,0,0] for unknown bones
+    boneWorldPosition(name) {
+        let index = this.bones.findIndex(bone => bone.name.toLowerCase() == name.toLowerCase());
+        if (index < 0)
+            return [0, 0, 0];
+        let position = [0, 0, 0];
+        let rotation = [0, 0, 0, 1];
+        //Walk up to the root, applying each parent's local transform (scale is ignored)
+        let chain = [];
+        for (let i = index; i >= 0; i = this.bones[i].parent)
+            chain.unshift(i);
+        chain.forEach(i => {
+            let bone = this.bones[i];
+            let offset = RIGFile.rotate(rotation, bone.position);
+            position = [position[0] + offset[0], position[1] + offset[1], position[2] + offset[2]];
+            rotation = RIGFile.multiply(rotation, bone.orientation);
+        });
+        return position;
+    }
+    static rotate(q, v) {
+        let [x, y, z, w] = q;
+        let ix = w * v[0] + y * v[2] - z * v[1];
+        let iy = w * v[1] + z * v[0] - x * v[2];
+        let iz = w * v[2] + x * v[1] - y * v[0];
+        let iw = -x * v[0] - y * v[1] - z * v[2];
+        return [
+            ix * w + iw * -x + iy * -z - iz * -y,
+            iy * w + iw * -y + iz * -x - ix * -z,
+            iz * w + iw * -z + ix * -y - iy * -x
+        ];
+    }
+    static multiply(a, b) {
+        let [ax, ay, az, aw] = a, [bx, by, bz, bw] = b;
+        return [
+            ax * bw + aw * bx + ay * bz - az * by,
+            ay * bw + aw * by + az * bx - ax * bz,
+            az * bw + aw * bz + ax * by - ay * bx,
+            aw * bw - ax * bx - ay * by - az * bz
+        ];
+    }
+}
+exports.RIGFile = RIGFile;
+RIGFile.TYPE = 0x8EAF13DE;
+//Animation (0x6B20C4F3): S4 wrapper header + embedded "_S3Clip_" codec block (see s4pe ClipResource / S3CLIP.Clip)
+class CLIPFile {
+    constructor(buffer, headerOnly = false) {
+        this.error = false;
+        this.version = 0;
+        this.flags = 0;
+        this.duration = 0;
+        this.clipName = "";
+        this.rigName = "";
+        //S3 clip block
+        this.frameDuration = 1 / 30;
+        this.frameCount = 0;
+        this.sourceName = "";
+        this.tracks = new Map();
+        try {
+            this.parse(buffer, headerOnly);
+        }
+        catch (error) {
+            this.error = true;
+        }
+    }
+    parse(b, headerOnly) {
+        this.version = b.readUInt32LE(0);
+        this.flags = b.readUInt32LE(4);
+        this.duration = b.readFloatLE(8);
+        //Wrapper layout is version dependent, the first two strings (clip name, rig namespace) are stable
+        //12: initial offset quaternion + translation (8 floats), 44: 3 namespace hashes, 56: clip name
+        let o = 56;
+        let clipNameLength = b.readUInt32LE(o);
+        o += 4;
+        if (clipNameLength > 0 && clipNameLength < 512 && o + clipNameLength <= b.length) {
+            this.clipName = b.subarray(o, o + clipNameLength).toString("latin1");
+            o += clipNameLength;
+            let rigNameLength = b.readUInt32LE(o);
+            o += 4;
+            if (rigNameLength < 512 && o + rigNameLength <= b.length)
+                this.rigName = b.subarray(o, o + rigNameLength).toString("latin1");
+        }
+        let magic = b.indexOf(Buffer.from(CLIPFile.S3_MAGIC, "latin1"));
+        if (magic < 0) {
+            this.error = true;
+            return;
+        }
+        let s3 = b.subarray(magic);
+        //Header
+        let h = 8;
+        h += 4; //version (2)
+        h += 4; //flags
+        this.frameDuration = s3.readFloatLE(h);
+        h += 4;
+        this.frameCount = s3.readUInt16LE(h);
+        h += 2;
+        h += 2; //unknown
+        let curveCount = s3.readUInt32LE(h);
+        h += 4;
+        let indexedFloatCount = s3.readUInt32LE(h);
+        h += 4;
+        let curveDataOffset = s3.readUInt32LE(h);
+        h += 4;
+        let frameDataOffset = s3.readUInt32LE(h);
+        h += 4;
+        let animNameOffset = s3.readUInt32LE(h);
+        h += 4;
+        let srcNameOffset = s3.readUInt32LE(h);
+        h += 4;
+        if (!this.clipName)
+            this.clipName = this.readZString(s3, animNameOffset);
+        this.sourceName = this.readZString(s3, srcNameOffset);
+        if (headerOnly)
+            return;
+        //Indexed floats (shared value table for the indexed frame format)
+        let indexedFloats = [];
+        for (let i = 0; i < indexedFloatCount; i++)
+            indexedFloats.push(s3.readFloatLE(frameDataOffset + i * 4));
+        //Curves
+        for (let i = 0; i < curveCount; i++) {
+            let c = curveDataOffset + i * 20;
+            let dataOffset = s3.readUInt32LE(c);
+            let trackKey = s3.readUInt32LE(c + 4);
+            let offset = s3.readFloatLE(c + 8);
+            let scale = s3.readFloatLE(c + 12);
+            let frameCount = s3.readUInt16LE(c + 16);
+            let flags = s3[c + 18];
+            let curveType = s3[c + 19]; //1 position, 2 orientation
+            let dataType = flags & 0x07; //1 float1, 2 float3, 4 float4
+            let packed = (flags >> 4) == 1; //0 indexed, 1 packed
+            let floatCount = dataType == 4 ? 4 : dataType == 2 ? 3 : 1;
+            let frames = [];
+            let p = dataOffset;
+            for (let f = 0; f < frameCount; f++) {
+                let frameIndex = s3.readUInt16LE(p);
+                let frameFlags = s3.readUInt16LE(p + 2); //low 4 bits: sign per component
+                p += 4;
+                let values = [];
+                if (!packed) {
+                    for (let k = 0; k < floatCount; k++) {
+                        let v = indexedFloats[s3.readUInt16LE(p)] ?? 0;
+                        p += 2;
+                        if (frameFlags & (1 << k))
+                            v = -v;
+                        values.push(v * scale + offset);
+                    }
+                }
+                else if (dataType == 2) {
+                    //3 x 10 bit in one uint32
+                    let raw = s3.readUInt32LE(p);
+                    p += 4;
+                    for (let k = 0; k < 3; k++) {
+                        let v = ((raw >>> (k * 10)) & 0x3FF) / 0x3FF;
+                        if (frameFlags & (1 << k))
+                            v = -v;
+                        values.push(v * scale + offset);
+                    }
+                }
+                else {
+                    //12 bit per component, one uint16 each
+                    for (let k = 0; k < floatCount; k++) {
+                        let v = (s3.readUInt16LE(p) & 0xFFF) / 0xFFF;
+                        p += 2;
+                        if (frameFlags & (1 << k))
+                            v = -v;
+                        values.push(v * scale + offset);
+                    }
+                }
+                frames.push({ frame: frameIndex, values });
+            }
+            if (curveType != 1 && curveType != 2)
+                continue;
+            let track = this.tracks.get(trackKey);
+            if (!track) {
+                track = { key: trackKey, position: undefined, orientation: undefined };
+                this.tracks.set(trackKey, track);
+            }
+            if (curveType == 1)
+                track.position = frames;
+            else
+                track.orientation = frames;
+        }
+    }
+    readZString(b, offset) {
+        if (offset <= 0 || offset >= b.length)
+            return "";
+        let end = b.indexOf(0, offset);
+        return b.subarray(offset, end < 0 ? b.length : end).toString("latin1");
+    }
+    //Pose packs export a handful of identical frames, real animations are longer
+    get isPose() {
+        return this.duration <= 0.5;
+    }
+    toJSON() {
+        return {
+            version: this.version,
+            duration: this.duration,
+            clipName: this.clipName,
+            rigName: this.rigName,
+            sourceName: this.sourceName,
+            frameDuration: this.frameDuration,
+            frameCount: this.frameCount,
+            isPose: this.isPose,
+            tracks: Array.from(this.tracks.values())
+        };
+    }
+}
+exports.CLIPFile = CLIPFile;
+CLIPFile.TYPE = 0x6B20C4F3;
+CLIPFile.S3_MAGIC = "_pilC3S_";
 class RMAPFile {
     constructor(buffer) {
         this.error = false;
@@ -5977,304 +6248,190 @@ class GEOMFile {
     }
     calculateData() {
         let byteBuffer = new ByteBuffer(this.buffer);
+        //RCOL header (see s4pe GenericRCOLResource.Parse)
         this.version = byteBuffer.getInt();
-        //console.log("Version: "+this.version.toString(16));
-        //PubicChunks +4 (int)
-        //Unused +4 (int)
-        //PubicChunks +4 (int)
-        //Counted TGI Block List +4 (int) ? Liste immer leer?
-        byteBuffer.skip(4 + 4 + 4);
-        //ChunkEntryList 
-        let chunkEntryListLength = byteBuffer.getInt();
-        //console.log("CHLength: "+chunkEntryListLength)
-        //console.log("0x"+chunkEntryListLength.toSt ring(16));
-        for (let index = 0; index < chunkEntryListLength; index++) {
-            let che_intance = byteBuffer.getLong();
-            let che_type = byteBuffer.getInt();
-            let che_group = byteBuffer.getInt();
-            //? 2 unknown ints
-            byteBuffer.skip(4 + 4);
-            let che_typeTag = byteBuffer.getInt();
-            let che_version = byteBuffer.getInt();
-            //? 2 unknown ints
-            byteBuffer.skip(4 + 4);
-            let che_shader = byteBuffer.getInt();
-            //? 5 unknown ints
-            byteBuffer.skip(16);
-            //console.log("InnerVersion: "+che_version.toString(16));
-            //MTNF
-            let che_shaderDataListLength = byteBuffer.getInt();
-            for (let che_s_index = 0; che_s_index < che_shaderDataListLength; che_s_index++) {
-                let value = byteBuffer.getInt();
-                byteBuffer.skip(12); //Data
-                //console.log("0x"+value.toString(16))
-            }
-            //console.log("POS (End SDATA): "+byteBuffer.pos.toString(16))
-            let mergeGroup = byteBuffer.getInt();
-            let sortOrder = byteBuffer.getInt();
-            //console.log("mergeGroup: 0x"+mergeGroup.toString(16));
-            //console.log("sortOrder: 0x"+sortOrder.toString(16));
-            //Big Skip to Vertex
-            //console.log("POS: "+byteBuffer.pos.toString(16))
-            //OLD
-            /*
-            if(che_version==0x0E){
-                //byteBuffer.skip(4+(10*16)+4);
-                byteBuffer.skip(4+(9*16)+4);
-            }else if(che_version==0x0C){
-                byteBuffer.skip(4+(8*16)); //Correct for Most
-                //byteBuffer.skip(4+(10*16)+4); // Somtimes?
-            }else{
-                this.error = true;
-                return;
-            }*/
-            //Stupid
-            let max = 16 * 24;
-            let found = false;
-            let pre1 = 1;
-            let pre2 = 1;
-            for (let index = max; index >= 0; index--) {
-                let value = byteBuffer.getInt();
-                let next = byteBuffer.getInt();
-                byteBuffer.pos = byteBuffer.pos - 4;
-                if (value > 0 && value < 12 && next > 0 && next < 12 && pre1 == 0 && pre2 != 0) {
-                    index = -1;
-                    byteBuffer.pos = byteBuffer.pos - 8;
-                    //console.log("FOUND: 0x"+value);
-                    found = true;
-                }
-                pre1 = pre2;
-                pre2 = value;
-            }
-            if (!found) {
+        byteBuffer.skip(4 + 4); //publicChunks, unused
+        let resourceCount = byteBuffer.getInt(); //external TGI references
+        let chunkCount = byteBuffer.getInt();
+        //Chunk TGIs (ITG order)
+        byteBuffer.skip(chunkCount * 16);
+        //External resource TGIs (ITG order)
+        byteBuffer.skip(resourceCount * 16);
+        //Chunk index (position, length)
+        let index = [];
+        for (let i = 0; i < chunkCount; i++) {
+            index.push({ position: byteBuffer.getInt(), length: byteBuffer.getInt() });
+        }
+        //s4pe derives the position for single chunk files instead of trusting the index
+        if (chunkCount == 1) {
+            index[0].position = 0x2c + resourceCount * 16;
+            index[0].length = this.buffer.length - index[0].position;
+        }
+        for (let i = 0; i < chunkCount; i++) {
+            byteBuffer.pos = index[i].position;
+            if (!this.readGEOMChunk(byteBuffer)) {
                 this.error = true;
                 console.log("Error: " + this.instanceID);
                 return;
             }
-            //console.log("POS: "+byteBuffer.pos.toString(16))
-            let vertexDataLength = byteBuffer.getInt();
-            this.vertexCount = vertexDataLength;
-            //console.log("VERTEX Length: "+vertexDataLength.toString(16));
-            let vertexFormatList = [];
-            let vertexFormatListLenght = byteBuffer.getInt();
-            let vertexPartLength = 0;
-            //console.log("VertexFormatList: 0x"+vertexFormatListLenght.toString(16));
-            for (let vfi = 0; vfi < vertexFormatListLenght; vfi++) {
-                let value = byteBuffer.getInt();
-                let extra_1 = byteBuffer.getInt();
-                let extra_2 = byteBuffer.getByte();
-                let obj = {
-                    value: value,
-                    e1: extra_1,
-                    e2: extra_2
-                };
-                vertexFormatList.push(obj);
-                vertexPartLength += this.getVertexFormatLength(value);
-            }
-            let vertexList = [];
-            if (!this.onlyValues) {
-                for (let vIndex = 0; vIndex < vertexDataLength; vIndex++) {
-                    let vertex = {};
-                    for (let vfi = 0; vfi < vertexFormatList.length; vfi++) {
-                        const vertexFormatType = vertexFormatList[vfi].value;
-                        this.addVertex(vertexFormatType, byteBuffer, vertex);
-                    }
-                    if (!this.onlyValues)
-                        vertexList.push(vertex);
-                }
-            }
-            else {
-                let skip = vertexPartLength * vertexDataLength;
-                byteBuffer.skip(skip);
-            }
-            let facesList = [];
-            byteBuffer.skip(5);
-            let faceDataLengthTotal = byteBuffer.getInt();
-            let facesDataLength = faceDataLengthTotal / 3;
-            this.facesCount = facesDataLength;
-            if (!this.onlyValues) {
-                for (let fIndex = 0; fIndex < facesDataLength; fIndex++) {
-                    let v1 = byteBuffer.getShort();
-                    let v2 = byteBuffer.getShort();
-                    let v3 = byteBuffer.getShort();
-                    let face = [v1, v2, v3];
-                    facesList.push(face);
-                }
-                let chunk = {
-                    vertex: vertexList,
-                    faces: facesList
-                };
-                this.chunks.push(chunk);
-            }
         }
     }
-    addVertex(type, byteBuffer, obj) {
+    //Reads one GEOM chunk (see s4pe GEOM.Parse), returns false on invalid data
+    readGEOMChunk(byteBuffer) {
+        let tag = byteBuffer.getInt();
+        if (tag != GEOMFile.TAG_GEOM)
+            return false;
+        //s4pe knows 0x05, 0x0C, 0x0D, 0x0E; newer game builds write 0x0F with the same layout up to the faces
+        byteBuffer.getInt();
+        //TGI block list offset (relative to the position after the field) and size
+        let tgiOffset = byteBuffer.getInt();
+        let tgiPosition = byteBuffer.pos + tgiOffset;
+        let tgiSize = byteBuffer.getInt();
+        let shader = byteBuffer.getInt();
+        if (shader != 0) {
+            let mtnfSize = byteBuffer.getInt();
+            let mtnfStart = byteBuffer.pos;
+            byteBuffer.pos = mtnfStart + mtnfSize;
+        }
+        let mergeGroup = byteBuffer.getInt();
+        let sortOrder = byteBuffer.getInt();
+        let vertexDataLength = byteBuffer.getInt();
+        this.vertexCount = vertexDataLength;
+        let vertexFormatList = [];
+        let vertexFormatListLenght = byteBuffer.getInt();
+        let vertexPartLength = 0;
+        for (let vfi = 0; vfi < vertexFormatListLenght; vfi++) {
+            let value = byteBuffer.getInt();
+            let extra_1 = byteBuffer.getInt();
+            let extra_2 = byteBuffer.getByte();
+            vertexFormatList.push({ value: value, e1: extra_1, e2: extra_2 });
+            vertexPartLength += extra_2;
+        }
+        if (vertexDataLength < 0 || byteBuffer.pos + vertexPartLength * vertexDataLength > byteBuffer.max)
+            return false;
+        let vertexList = [];
+        let maxBoneIndex = -1;
+        if (!this.onlyValues) {
+            for (let vIndex = 0; vIndex < vertexDataLength; vIndex++) {
+                let vertex = {};
+                for (let vfi = 0; vfi < vertexFormatList.length; vfi++) {
+                    const format = vertexFormatList[vfi];
+                    this.addVertex(format.value, format.e2, byteBuffer, vertex);
+                }
+                if (vertex.b) {
+                    for (let k = 0; k < 4; k++) {
+                        if ((!vertex.w || vertex.w[k] > 0) && vertex.b[k] > maxBoneIndex)
+                            maxBoneIndex = vertex.b[k];
+                    }
+                }
+                vertexList.push(vertex);
+            }
+        }
+        else {
+            byteBuffer.skip(vertexPartLength * vertexDataLength);
+        }
+        let numSubMeshes = byteBuffer.getInt();
+        if (numSubMeshes != 1)
+            return false;
+        let facePointSize = byteBuffer.getByte();
+        if (facePointSize != 2 && facePointSize != 4)
+            return false;
+        let faceDataLengthTotal = byteBuffer.getInt();
+        let facesDataLength = Math.floor(faceDataLengthTotal / 3);
+        this.facesCount = facesDataLength;
+        if (byteBuffer.pos + faceDataLengthTotal * facePointSize > byteBuffer.max)
+            return false;
+        if (!this.onlyValues) {
+            let facesList = [];
+            for (let fIndex = 0; fIndex < facesDataLength; fIndex++) {
+                let v1 = facePointSize == 2 ? byteBuffer.getShort() : byteBuffer.getInt();
+                let v2 = facePointSize == 2 ? byteBuffer.getShort() : byteBuffer.getInt();
+                let v3 = facePointSize == 2 ? byteBuffer.getShort() : byteBuffer.getInt();
+                facesList.push([v1, v2, v3]);
+            }
+            this.chunks.push({
+                vertex: vertexList,
+                faces: facesList,
+                mergeGroup: mergeGroup,
+                sortOrder: sortOrder,
+                boneHashes: this.readBoneHashes(byteBuffer, tgiPosition, tgiSize, maxBoneIndex + 1)
+            });
+        }
+        else {
+            byteBuffer.skip(faceDataLengthTotal * facePointSize);
+        }
+        return true;
+    }
+    //Bone hash list (uint32 count + fnv32 hashes, matches the RIG bone hashes) that sits just before the TGI block list.
+    readBoneHashes(byteBuffer, tgiPosition, tgiSize, minCount) {
+        if (tgiPosition < 8 || tgiPosition + 4 > byteBuffer.max)
+            return [];
+        let save = byteBuffer.pos;
+        try {
+            byteBuffer.pos = tgiPosition;
+            let tgiCount = byteBuffer.getInt();
+            if (tgiCount < 0 || tgiCount > 64 || (tgiSize > 0 && tgiSize != 4 + tgiCount * 16))
+                return [];
+            for (let trailing = 0; trailing <= 2; trailing++) {
+                let end = tgiPosition - trailing * 4;
+                let maxCount = Math.min(256, Math.floor((end - 4) / 4));
+                for (let count = Math.max(1, minCount); count <= maxCount; count++) {
+                    byteBuffer.pos = end - 4 - count * 4;
+                    if (byteBuffer.getInt() != count)
+                        continue;
+                    let hashes = [];
+                    for (let i = 0; i < count; i++)
+                        hashes.push(byteBuffer.getInt() >>> 0);
+                    if (hashes.every(hash => hash >= 0x10000))
+                        return hashes;
+                }
+            }
+        }
+        finally {
+            byteBuffer.pos = save;
+        }
+        return [];
+    }
+    addVertex(type, elementSize, byteBuffer, obj) {
+        let start = byteBuffer.pos;
         if (type == 0x1) {
-            //Position
-            let pos_x = byteBuffer.getFloat();
-            let pos_y = byteBuffer.getFloat();
-            let pos_z = byteBuffer.getFloat();
-            let arr = [];
-            arr.push(pos_x);
-            arr.push(pos_y);
-            arr.push(pos_z);
-            obj.p = arr;
+            obj.p = [byteBuffer.getFloat(), byteBuffer.getFloat(), byteBuffer.getFloat()];
         }
         else if (type == 0x2) {
-            //Normals
-            let normal_x = byteBuffer.getFloat();
-            let normal_y = byteBuffer.getFloat();
-            let normal_z = byteBuffer.getFloat();
-            let arr = [];
-            arr.push(normal_x);
-            arr.push(normal_y);
-            arr.push(normal_z);
-            obj.n = arr;
+            obj.n = [byteBuffer.getFloat(), byteBuffer.getFloat(), byteBuffer.getFloat()];
         }
         else if (type == 0x3) {
-            //UV 
             let uv1 = byteBuffer.getFloat();
-            ;
             let uv2 = byteBuffer.getFloat();
             if (obj.u) {
-                obj.u.push(uv1);
-                obj.u.push(uv2);
+                obj.u.push(uv1, uv2);
             }
             else {
-                let arr = [];
-                arr.push(uv1);
-                arr.push(uv2);
-                obj.u = arr;
+                obj.u = [uv1, uv2];
+            }
+        }
+        else if (type == 0x4 && elementSize == 4) {
+            obj.b = [byteBuffer.getByte(), byteBuffer.getByte(), byteBuffer.getByte(), byteBuffer.getByte()];
+        }
+        else if (type == 0x5 && (elementSize == 16 || elementSize == 4)) {
+            if (elementSize == 16) {
+                obj.w = [byteBuffer.getFloat(), byteBuffer.getFloat(), byteBuffer.getFloat(), byteBuffer.getFloat()];
+            }
+            else {
+                obj.w = [byteBuffer.getByte() / 255, byteBuffer.getByte() / 255, byteBuffer.getByte() / 255, byteBuffer.getByte() / 255];
             }
         }
         else if (type == 0x7) {
-            //Color
-            let color = byteBuffer.getInt();
-            obj.c = color;
+            obj.c = byteBuffer.getInt();
         }
-        else if (type == 0x4) {
-            //Bones
-            byteBuffer.skip(4);
-        }
-        else if (type == 0x5) {
-            //Weights
-            byteBuffer.skip(4);
-        }
-        else if (type == 0x6) {
-            //Tangent Normal
-            byteBuffer.skip(12);
-        }
-        else if (type == 0xA) {
-            //VertexID
-            byteBuffer.skip(4);
-        }
-        /*
-        //Pos
-                let pos_x = byteBuffer.getFloat();
-                let pos_y = byteBuffer.getFloat();
-                let pos_z = byteBuffer.getFloat();
-
-                //Normal
-                let normal_x = byteBuffer.getFloat();
-                let normal_y = byteBuffer.getFloat();
-                let normal_z = byteBuffer.getFloat();
-
-                //UV
-                let uvs : any [] = [];
-                let uvCount = 0;
-                if(che_version==0x0E){
-                    uvCount=4;
-                }else if(che_version==0x0C){
-                    uvCount=6;
-                }
-                for (let ui = 0; ui < uvCount; ui++) {
-                    const element = byteBuffer.getFloat();
-                    uvs.push(element);
-                }
-
-
-                let color = 0;
-                if(che_version==0x0E){
-                    
-                    //Color
-                    color = byteBuffer.getInt();
-                    //Bones
-                    byteBuffer.skip(4);
-
-                    //Weights
-                    byteBuffer.skip(4);
-
-                    //TangentNormal
-                    byteBuffer.skip(12);
-
-                }else if(che_version==0x0C){
-                    //Bones
-                    byteBuffer.skip(4);
-                    //Weights
-                    byteBuffer.skip(4);
-                    //VertexID
-                    byteBuffer.skip(4);
-                    //Color
-                    color = byteBuffer.getInt();
-                    //TangentNormal
-                    byteBuffer.skip(12);
-                }
-
-
-                
-               
-                
-
-                let vertex = {
-                    color:color,
-                    px:pos_x,
-                    py:pos_y,
-                    pz:pos_z,
-                    nx:normal_x,
-                    ny:normal_y,
-                    nz:normal_z,
-                    uv:uvs,
-                    chversion:che_version
-                };
-               
-                //if(vIndex < vertexDataLength)console.log(pos_x+" : "+pos_y+" : "+pos_z);
-                //if(vIndex > vertexDataLength-5)console.log(vertex);
-                if(vIndex <1)console.log(vertex);
-         */
-    }
-    getVertexFormatLength(type) {
-        if (type == 0x1) {
-            return 12;
-        }
-        else if (type == 0x2) {
-            return 12;
-            ;
-        }
-        else if (type == 0x3) {
-            return 8;
-        }
-        else if (type == 0x7) {
-            return 4;
-        }
-        else if (type == 0x4) {
-            return 4;
-        }
-        else if (type == 0x5) {
-            return 4;
-        }
-        else if (type == 0x6) {
-            return 12;
-        }
-        else if (type == 0xA) {
-            return 4;
-        }
-        return 0;
+        byteBuffer.pos = start + elementSize;
     }
     toString() {
         return "GEOM v" + this.version;
     }
 }
 exports.GEOMFile = GEOMFile;
+GEOMFile.TAG_GEOM = 0x4D4F4547;
 class ZoneObjFile {
     constructor(buffer) {
         this.instanceID = "";
@@ -9004,6 +9161,7 @@ var TagType;
     TagType[TagType["MLOD"] = 20] = "MLOD";
     TagType[TagType["MODL"] = 21] = "MODL";
     TagType[TagType["SMOD"] = 22] = "SMOD";
+    TagType[TagType["RIG"] = 23] = "RIG";
 })(TagType || (exports.TagType = TagType = {}));
 class Helper {
     static getBodyTypes(file) {

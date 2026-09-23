@@ -53,7 +53,7 @@ describe('SymlinkService Creator / item layout', () => {
     const manifestCall = invoke.mock.calls.find(([channel]) => channel === 'fs:writeFile');
     expect(manifestCall).toBeDefined();
     expect(JSON.parse(manifestCall![2] as string)).toEqual({
-      version: 1,
+      version: 2,
       entries: [{ path: expectedTarget, type: 'dir' }],
     });
   });

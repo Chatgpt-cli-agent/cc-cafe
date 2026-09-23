@@ -63,6 +63,7 @@ export interface CurseForgeSearchResult {
     resultCount: number;
     totalCount: number;
   };
+  source?: 'live' | 'cache';
 }
 
 interface ProfileMod {
@@ -267,6 +268,16 @@ export class CurseForgeProxyService {
     return results;
   }
 
+  private uniqueModsById(mods: TransformedMod[]): TransformedMod[] {
+    const uniqueMods = new Map<number, TransformedMod>();
+    for (const mod of mods) {
+      if (!uniqueMods.has(mod.id)) {
+        uniqueMods.set(mod.id, mod);
+      }
+    }
+    return Array.from(uniqueMods.values());
+  }
+
   private getClassIdForCategory(categoryName?: string): number | undefined {
     if (!categoryName) {
       return undefined;
@@ -353,6 +364,8 @@ export class CurseForgeProxyService {
       }
     }
 
+    allMods = this.uniqueModsById(allMods);
+
     let finalMods = allMods;
     if (hasTextQuery) {
       const scoredMods = this.advancedSearch.searchAndScore(allMods, normalizedQuery);
@@ -395,6 +408,7 @@ export class CurseForgeProxyService {
         resultCount: paginatedMods.length,
         totalCount: hasTextQuery ? finalMods.length : totalCountFromApi,
       },
+      source: 'live',
     };
   }
 
@@ -452,6 +466,8 @@ export class CurseForgeProxyService {
         ? cachedMods[modId]
         : this.profileModToTransformedMod(profileMod);
     });
+
+    allMods = this.uniqueModsById(allMods);
 
     if (allMods.length === 0 && liveSearchError) {
       const message = liveSearchError instanceof Error ? liveSearchError.message : 'Unknown error';
@@ -522,7 +538,8 @@ export class CurseForgeProxyService {
         pageSize: pageSize,
         resultCount: paginatedMods.length,
         totalCount: finalMods.length
-      }
+      },
+      source: 'cache',
     };
 
     return transformed;

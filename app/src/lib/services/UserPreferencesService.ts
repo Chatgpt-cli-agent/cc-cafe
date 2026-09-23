@@ -7,6 +7,8 @@
 
 import type { SupportedLanguage } from '@/context/LanguageContext';
 import { getCompatStorageItem, setCompatStorageItem } from '@/lib/utils/storageCompat';
+import type { InstallLayoutMode } from '@/types/profile';
+import { DEFAULT_LIBRARY_ROOT } from '@/lib/services/LibraryPathsService';
 
 /**
  * User preferences structure
@@ -17,6 +19,9 @@ export interface UserPreferences {
   fakeModDetection: boolean;
   gameLogging: boolean;
   showDebugLogs: boolean;
+  installLayoutMode: InstallLayoutMode;
+  installLayoutVersion: number;
+  libraryRoot: string;
   language: SupportedLanguage | null;
 }
 
@@ -29,6 +34,9 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   fakeModDetection: true,
   gameLogging: true,
   showDebugLogs: false,
+  installLayoutMode: 'game-mirror',
+  installLayoutVersion: 3,
+  libraryRoot: DEFAULT_LIBRARY_ROOT,
   language: null,
 };
 
@@ -45,7 +53,7 @@ export class UserPreferencesService {
    * Initialize and load preferences from storage
    */
   async initialize(): Promise<void> {
-    if (this.initialized) {
+    if (this.initialized && this.preferences.libraryRoot && this.preferences.libraryRoot !== '/mnt/San-Myshuno/JDownloader') {
       return;
     }
 
@@ -53,10 +61,28 @@ export class UserPreferencesService {
       const stored = getCompatStorageItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Partial<UserPreferences>;
+        const migratedLayout = parsed.installLayoutVersion === 3
+          ? parsed.installLayoutMode
+          : parsed.installLayoutVersion === 2
+            ? parsed.installLayoutMode
+            : parsed.installLayoutMode === 'cc-folder'
+              ? 'creator-cc-folder'
+              : parsed.installLayoutMode;
         this.preferences = {
           ...DEFAULT_PREFERENCES,
           ...parsed,
+          installLayoutMode: migratedLayout || DEFAULT_PREFERENCES.installLayoutMode,
+          installLayoutVersion: 3,
+          libraryRoot: parsed.libraryRoot || DEFAULT_PREFERENCES.libraryRoot,
         };
+      }
+      if (!this.preferences.libraryRoot || this.preferences.libraryRoot === '/mnt/San-Myshuno/JDownloader') {
+        const documents = await window.electron.ipcRenderer.invoke('path:documentDir');
+        if (!documents) throw new Error('Could not locate your Documents folder');
+        const libraryRoot = await window.electron.ipcRenderer.invoke('path:join', documents, 'CC Cafe Library');
+        await window.electron.ipcRenderer.invoke('fs:mkdir', libraryRoot, { recursive: true });
+        this.preferences.libraryRoot = libraryRoot;
+        this.savePreferences();
       }
       this.initialized = true;
     } catch (error) {
@@ -76,10 +102,20 @@ export class UserPreferencesService {
         const stored = getCompatStorageItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored) as Partial<UserPreferences>;
-          this.preferences = {
-            ...DEFAULT_PREFERENCES,
-            ...parsed,
-          };
+            const migratedLayout = parsed.installLayoutVersion === 3
+              ? parsed.installLayoutMode
+              : parsed.installLayoutVersion === 2
+                ? parsed.installLayoutMode
+                : parsed.installLayoutMode === 'cc-folder'
+                  ? 'creator-cc-folder'
+                  : parsed.installLayoutMode;
+            this.preferences = {
+              ...DEFAULT_PREFERENCES,
+              ...parsed,
+              installLayoutMode: migratedLayout || DEFAULT_PREFERENCES.installLayoutMode,
+              installLayoutVersion: 3,
+              libraryRoot: parsed.libraryRoot || DEFAULT_PREFERENCES.libraryRoot,
+            };
         }
         this.initialized = true;
       } catch (error) {
@@ -179,6 +215,34 @@ export class UserPreferencesService {
   setShowDebugLogs(enabled: boolean): void {
     this.ensureInitialized();
     this.preferences.showDebugLogs = enabled;
+    this.savePreferences();
+  }
+
+  /**
+   * Get install layout mode preference
+   */
+  getInstallLayoutMode(): InstallLayoutMode {
+    this.ensureInitialized();
+    return this.preferences.installLayoutMode;
+  }
+
+  /**
+   * Set install layout mode preference
+   */
+  setInstallLayoutMode(mode: InstallLayoutMode): void {
+    this.ensureInitialized();
+    this.preferences.installLayoutMode = mode;
+    this.savePreferences();
+  }
+
+  getLibraryRoot(): string {
+    this.ensureInitialized();
+    return this.preferences.libraryRoot;
+  }
+
+  setLibraryRoot(libraryRoot: string): void {
+    this.ensureInitialized();
+    this.preferences.libraryRoot = libraryRoot;
     this.savePreferences();
   }
 

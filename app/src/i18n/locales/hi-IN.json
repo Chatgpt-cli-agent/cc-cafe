@@ -219,9 +219,12 @@
           "mods_folder": "Mods folder",
           "creator_folder": "Creator folder",
           "creator_cc_folder": "Creator / item",
-          "cc_folder": "CC folder"
+          "cc_folder": "CC folder",
+          "game_mirror": "Game mirror"
         }
       },
+      "library_root": { "title": "Library folder", "description": "Stores downloaded content in CC Cafe Library under your Documents folder by default. Use the folder picker to choose another location.", "detected": "Library folder found", "not_found": "Library folder not found" },
+      "deploy_to_game": { "title": "Deploy library to game", "description": "Copy CC, Tray, and Gameplay Mods from the library into your game folders without overwriting existing files.", "button": "Deploy to game", "running": "Deploying...", "success": "Deployed {{copied}} file(s). {{conflicts}} existing file(s) were left unchanged.", "failed": "Deploy failed", "missing_paths": "Configure both the library folder and mods folder before deploying." },
       "fake_detection": {
         "title": "नकली मॉड पहचान",
         "description": "संदिग्ध मॉड्स का पता चलने पर चेतावनियाँ दिखाएँ और प्रतिबंधित निर्माताओं को ब्लॉक करें।"
@@ -652,6 +655,7 @@
       "failed_to_activate": "प्रोफ़ाइल सक्रिय करने में विफल",
       "still_initializing": "प्रोफ़ाइल सिस्टम अभी भी आरंभ हो रहा है। कृपया कुछ क्षण प्रतीक्षा करें और पुनः प्रयास करें।",
       "mods_path_not_configured": "मॉड्स पथ कॉन्फ़िगर नहीं किया गया। The Sims 4 इंस्टॉलेशन नहीं मिल सका।",
+      "library_path_not_configured": "Library folder not configured. Set it in Settings before activating a profile in game-mirror mode.",
       "profile_not_found": "प्रोफ़ाइल नहीं मिली",
       "failed_to_create_symlinks": "{{count}} सिम्लिंक्स बनाने में विफल:\n{{errors}}\n\nअनुमतियों की जाँच करें और सुनिश्चित करें कि The Sims 4 नहीं चल रहा है।",
       "mod_removed": "मॉड हटाया गया",

@@ -101,14 +101,87 @@ export interface CasItemsResult {
   cobjGroups: any[];
 }
 
+export interface MeshVertex {
+  x?: number;
+  y?: number;
+  z?: number;
+  v?: number;
+  p?: number[];
+  n?: number[];
+  u?: number[] | number;
+  b?: number[];
+  w?: number[];
+}
+
 export interface ModelChunk {
-  vertex: Record<string, number>[];
+  vertex: MeshVertex[];
   faces: number[][];
+  boneHashes?: number[];
+}
+
+export interface BodyPartMesh {
+  name: string;
+  key: string;
+  chunks: ModelChunk[];
 }
 
 export interface ModelResult {
   models: { address: string; data: ModelChunk[] }[];
   missingAddresses: string[];
+}
+
+export interface ClipSummary {
+  address: string;
+  name: string;
+  rigName: string;
+  sourceName: string;
+  duration: number;
+  frameCount: number;
+  isPose: boolean;
+}
+
+export interface ClipTrackFrame {
+  frame: number;
+  values: number[];
+}
+
+export interface ClipTrack {
+  key: number;
+  position?: ClipTrackFrame[];
+  orientation?: ClipTrackFrame[];
+}
+
+export interface ClipPayload {
+  clipName: string;
+  duration: number;
+  frameDuration: number;
+  frameCount: number;
+  isPose: boolean;
+  tracks: ClipTrack[];
+}
+
+export interface RigBone {
+  name: string;
+  hash: number;
+  parent: number;
+  position: number[];
+  orientation: number[];
+  scale: number[];
+}
+
+export interface RigPayload {
+  address: string;
+  name: string;
+  file: string;
+  bones: RigBone[];
+  headHeight: number;
+}
+
+export interface ClipDetail {
+  clip: ClipPayload;
+  rig: RigPayload | null;
+  rigScore: number;
+  rigCount: number;
 }
 
 export interface PackageInspection {
@@ -234,6 +307,18 @@ class S4mmToolsService {
 
   getTexture(filePath: string, address: string) {
     return this.invoke<{ address: string; dataUrl: string | null }>('s4mm:objectviewer-texture', { filePath, address });
+  }
+
+  listClips(filePath: string) {
+    return this.invoke<ClipSummary[]>('s4mm:objectviewer-clips', { filePath });
+  }
+
+  getClip(filePath: string, address: string, gamePath?: string | null) {
+    return this.invoke<ClipDetail>('s4mm:objectviewer-clip', { filePath, address, gamePath });
+  }
+
+  getBodyParts(gamePath?: string | null) {
+    return this.invoke<BodyPartMesh[]>('s4mm:objectviewer-body', { gamePath });
   }
 
   // Package inspection

@@ -9,7 +9,12 @@ import { LocalModImportService } from '@/lib/services/LocalModImportService';
 vi.mock('@/lib/services/ModCacheService', () => ({
   modCacheService: {
     addToCache: vi.fn(),
+    getCachedMod: vi.fn().mockResolvedValue(null),
+    getCachePath: vi.fn().mockResolvedValue('/mock/cache'),
   },
+  isSaveFileName: vi.fn(
+    (name: string) => name.toLowerCase().endsWith('.save') || /\.save\.ver\d+$/i.test(name)
+  ),
 }));
 
 vi.mock('@/lib/services/ProfileService', () => ({
@@ -26,9 +31,21 @@ vi.mock('@/lib/services/FakeScoreService', () => ({
   },
 }));
 
+vi.mock('@/lib/services/LibraryInstallService', () => ({
+  installCachedModToLibrary: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('@/lib/services/SaveInstallService', () => ({
+  saveInstallService: {
+    installSavesFromCache: vi.fn().mockResolvedValue({ installed: [], backups: [] }),
+  },
+}));
+
 import { modCacheService } from '@/lib/services/ModCacheService';
 import { profileService } from '@/lib/services/ProfileService';
 import { fakeScoreService } from '@/lib/services/FakeScoreService';
+import { installCachedModToLibrary } from '@/lib/services/LibraryInstallService';
+import { saveInstallService } from '@/lib/services/SaveInstallService';
 
 const invoke = vi.mocked(window.electron.ipcRenderer.invoke);
 
@@ -360,6 +377,33 @@ describe('LocalModImportService', () => {
       await service.importModFiles();
 
       expect(invoke).toHaveBeenCalledWith('fs:remove', expect.any(String), { recursive: true });
+    });
+
+    it('should route save-file archives into the Saves folder and skip the library mirror', async () => {
+      mockElectron({ filePaths: ['/path/to/save.zip'] });
+      vi.mocked(modCacheService.addToCache).mockResolvedValue({
+        fileHash: 'abc123',
+        modId: 'uuid-1',
+        fileName: 'save.zip',
+        fileSize: 1024,
+        downloadedAt: '2024-01-01',
+        usedByProfiles: ['profile-1'],
+        files: [
+          { relativePath: 'Slot_00000014.save', fileName: 'Slot_00000014.save', fileSize: 100 },
+        ],
+      });
+      vi.mocked(modCacheService.getCachePath).mockResolvedValue('/mock/cache');
+
+      const result = await service.importModFiles();
+
+      expect(result.successful).toBe(1);
+      expect(saveInstallService.installSavesFromCache).toHaveBeenCalledWith(
+        '/mock/cache',
+        expect.arrayContaining([
+          { relativePath: 'Slot_00000014.save', fileName: 'Slot_00000014.save', fileSize: 100 },
+        ])
+      );
+      expect(installCachedModToLibrary).not.toHaveBeenCalled();
     });
   });
 });

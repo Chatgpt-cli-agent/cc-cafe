@@ -175,7 +175,7 @@ const s4mmTools: ToolDefinition[] = [
   {
     id: 'object-viewer',
     title: '3D CAS viewer',
-    description: 'View CAS meshes (LODs, swatches, textures) from package files in 3D.',
+    description: 'View CAS meshes and play animation clips on the adult Sim body.',
     status: 'ready',
   },
   {

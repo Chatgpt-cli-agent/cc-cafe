@@ -53,6 +53,7 @@ export class Sims4PathDetector {
   async getPaths(): Promise<Sims4Paths> {
     let gamePath: string | null = null;
     let modsPath: string | null = null;
+    let libraryRoot: string | null = null;
 
     // Try to load from localStorage (user-configured paths from Settings)
     if (typeof window !== 'undefined') {
@@ -65,18 +66,23 @@ export class Sims4PathDetector {
       if (encryptedModsPath) {
         modsPath = await this.decryptData(encryptedModsPath);
       }
+
+      const encryptedLibraryRoot = getCompatStorageItem('cccafe_library_path');
+      if (encryptedLibraryRoot) {
+        libraryRoot = await this.decryptData(encryptedLibraryRoot);
+      }
     }
 
     // If paths found in localStorage, validate and return them
-    if (gamePath || modsPath) {
-      return { gamePath, modsPath };
+    if (gamePath || modsPath || libraryRoot) {
+      return { gamePath, modsPath, libraryRoot };
     }
 
     // Fall back to auto-detection if not configured
     gamePath = await this.detectGamePath();
     modsPath = await this.detectModsPath();
 
-    return { gamePath, modsPath };
+    return { gamePath, modsPath, libraryRoot: null };
   }
 
   /**

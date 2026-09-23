@@ -219,9 +219,12 @@
           "mods_folder": "Mods folder",
           "creator_folder": "Creator folder",
           "creator_cc_folder": "Creator / item",
-          "cc_folder": "CC folder"
+          "cc_folder": "CC folder",
+          "game_mirror": "Game mirror"
         }
       },
+      "library_root": { "title": "Library folder", "description": "Stores downloaded content in CC Cafe Library under your Documents folder by default. Use the folder picker to choose another location.", "detected": "Library folder found", "not_found": "Library folder not found" },
+      "deploy_to_game": { "title": "Deploy library to game", "description": "Copy CC, Tray, and Gameplay Mods from the library into your game folders without overwriting existing files.", "button": "Deploy to game", "running": "Deploying...", "success": "Deployed {{copied}} file(s). {{conflicts}} existing file(s) were left unchanged.", "failed": "Deploy failed", "missing_paths": "Configure both the library folder and mods folder before deploying." },
       "fake_detection": {
         "title": "假模组检测",
         "description": "检测到可疑模组时显示警告并阻止已封禁的创作者。"
@@ -652,6 +655,7 @@
       "failed_to_activate": "激活配置文件失败",
       "still_initializing": "配置文件系统仍在初始化中。请稍候再试。",
       "mods_path_not_configured": "模组路径未配置。无法找到 The Sims 4 安装。",
+      "library_path_not_configured": "Library folder not configured. Set it in Settings before activating a profile in game-mirror mode.",
       "profile_not_found": "未找到配置文件",
       "failed_to_create_symlinks": "创建 {{count}} 个符号链接失败：\n{{errors}}\n\n请检查权限并确保 The Sims 4 未在运行。",
       "mod_removed": "模组已移除",
