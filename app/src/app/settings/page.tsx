@@ -22,6 +22,7 @@ import { useLanguage, type SupportedLanguage } from '@/context/LanguageContext';
 import { useTranslation } from 'react-i18next';
 import * as flags from 'country-flag-icons/react/3x2';
 import type { InstallLayoutMode } from '@/types/profile';
+import { readStoredContentRoot, writeStoredContentRoot, type ContentPathGame } from '@/lib/gameContentPaths';
 
 interface Message {
   type: 'success' | 'error';
@@ -140,6 +141,10 @@ export default function SettingsPage() {
   const [libraryRoot, setLibraryRoot] = useState('');
   const [gamePathExists, setGamePathExists] = useState(false);
   const [modsPathExists, setModsPathExists] = useState(false);
+  const [inzoiContentPath, setInzoiContentPath] = useState('');
+  const [paralivesModsPath, setParalivesModsPath] = useState('');
+  const [inzoiContentExists, setInzoiContentExists] = useState(false);
+  const [paralivesModsExists, setParalivesModsExists] = useState(false);
   const [libraryRootExists, setLibraryRootExists] = useState(false);
   const [deployingLibrary, setDeployingLibrary] = useState(false);
   const [dangerMessage, setDangerMessage] = useState<Message | null>(null);
@@ -193,6 +198,13 @@ export default function SettingsPage() {
         }
       }
 
+      const inzoiPath = await readStoredContentRoot('inzoi');
+      const paralivesPath = await readStoredContentRoot('paralives');
+      setInzoiContentPath(inzoiPath);
+      setParalivesModsPath(paralivesPath);
+      setInzoiContentExists(await contentFolderExists('inzoi', inzoiPath));
+      setParalivesModsExists(await contentFolderExists('paralives', paralivesPath));
+
       // Load user preferences (auto-updates, backup, fake mod detection, game logging)
       await userPreferencesService.initialize();
       const preferences = userPreferencesService.getPreferences();
@@ -242,6 +254,19 @@ export default function SettingsPage() {
     setLanguage(lang);
     userPreferencesService.setLanguage(lang);
     setLanguageDropdownOpen(false);
+  }
+
+  async function contentFolderExists(gameId: ContentPathGame, folder: string): Promise<boolean> {
+    try {
+      const result = await (window as any).electron.ipcRenderer.invoke('games:content-roots', {
+        gameId,
+        contentRoot: folder || undefined,
+      });
+      return Array.isArray(result?.existing) && result.existing.length > 0;
+    } catch (error) {
+      console.error('Error checking content folder:', error);
+      return false;
+    }
   }
 
   async function checkPathExists(path: string): Promise<boolean> {
@@ -297,6 +322,30 @@ export default function SettingsPage() {
         const encrypted = await StorageHelper.encryptData(path);
         StorageHelper.setLocal('cccafe_mods_path', encrypted);
         setPathsMessage({ type: 'success', text: t('settings.game_location.mods_path_updated') });
+        setTimeout(() => setPathsMessage(null), 5000);
+      } catch (error) {
+        setPathsMessage({ type: 'error', text: t('settings.game_location.failed_to_save') });
+      }
+    }
+  }
+
+  async function handleContentFolderSelect(gameId: ContentPathGame) {
+    const result = await (window as any).electron.ipcRenderer.invoke('dialog:open', {
+      properties: ['openDirectory'],
+    });
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      const folder = result.filePaths[0] as string;
+      if (gameId === 'inzoi') setInzoiContentPath(folder);
+      else setParalivesModsPath(folder);
+
+      const folderExists = await contentFolderExists(gameId, folder);
+      if (gameId === 'inzoi') setInzoiContentExists(folderExists);
+      else setParalivesModsExists(folderExists);
+
+      try {
+        await writeStoredContentRoot(gameId, folder);
+        setPathsMessage({ type: 'success', text: t('settings.game_location.content_path_updated') });
         setTimeout(() => setPathsMessage(null), 5000);
       } catch (error) {
         setPathsMessage({ type: 'error', text: t('settings.game_location.failed_to_save') });
@@ -823,6 +872,62 @@ export default function SettingsPage() {
                   </div>
                   <div className={`mt-2 flex items-center gap-2 text-xs font-medium ${modsPathExists ? 'text-brand-green' : 'text-amber-500'}`}>
                     {modsPathExists ? (
+                      <>
+                        <CheckCircle size={16} /> {t('settings.game_location.mods_detected')}
+                      </>
+                    ) : (
+                      <>
+                        <Warning size={16} /> {t('settings.game_location.mods_not_found')}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('settings.game_location.inzoi_folder')}</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={inzoiContentPath}
+                      placeholder={t('settings.game_location.inzoi_folder_placeholder')}
+                      disabled
+                      className="w-full bg-gray-50 dark:bg-ui-input border border-gray-300 dark:border-ui-border text-gray-900 dark:text-gray-900 text-sm rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-brand-green outline-none disabled:opacity-90"
+                    />
+                    <button type="button" onClick={() => void handleContentFolderSelect('inzoi')} className="px-4 py-2 bg-gray-100 dark:bg-ui-hover border border-gray-300 dark:border-ui-border rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer">
+                      <FolderOpen size={20} />
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">{t('settings.game_location.inzoi_folder_hint')}</p>
+                  <div className={`mt-2 flex items-center gap-2 text-xs font-medium ${inzoiContentExists ? 'text-brand-green' : 'text-amber-500'}`}>
+                    {inzoiContentExists ? (
+                      <>
+                        <CheckCircle size={16} /> {t('settings.game_location.mods_detected')}
+                      </>
+                    ) : (
+                      <>
+                        <Warning size={16} /> {t('settings.game_location.mods_not_found')}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('settings.game_location.paralives_folder')}</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={paralivesModsPath}
+                      placeholder={t('settings.game_location.paralives_folder_placeholder')}
+                      disabled
+                      className="w-full bg-gray-50 dark:bg-ui-input border border-gray-300 dark:border-ui-border text-gray-900 dark:text-gray-900 text-sm rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-brand-green outline-none disabled:opacity-90"
+                    />
+                    <button type="button" onClick={() => void handleContentFolderSelect('paralives')} className="px-4 py-2 bg-gray-100 dark:bg-ui-hover border border-gray-300 dark:border-ui-border rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer">
+                      <FolderOpen size={20} />
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">{t('settings.game_location.paralives_folder_hint')}</p>
+                  <div className={`mt-2 flex items-center gap-2 text-xs font-medium ${paralivesModsExists ? 'text-brand-green' : 'text-amber-500'}`}>
+                    {paralivesModsExists ? (
                       <>
                         <CheckCircle size={16} /> {t('settings.game_location.mods_detected')}
                       </>

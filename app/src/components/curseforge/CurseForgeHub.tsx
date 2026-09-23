@@ -17,10 +17,13 @@ import { formatFileSize, formatRelativeDate } from '@/utils/formatters';
 import { getCompatStorageItem, setCompatStorageItem } from '@/lib/utils/storageCompat';
 import { BRANDING } from '@/lib/branding';
 import { BUILD_LABEL } from '@/lib/buildInfo';
+import InstalledModsPanel from '@/components/curseforge/InstalledModsPanel';
+import GameCatalogPanel from '@/components/games/GameCatalogPanel';
+import { useGame } from '@/context/GameContext';
 
-type HubTab = 'home' | 'favorites' | 'browse' | 'creators' | 'downloads' | 'updates';
+type HubTab = 'home' | 'installed' | 'favorites' | 'browse' | 'creators' | 'downloads' | 'updates';
 
-const HUB_TABS: HubTab[] = ['home', 'favorites', 'browse', 'creators', 'downloads', 'updates'];
+const HUB_TABS: HubTab[] = ['home', 'installed', 'favorites', 'browse', 'creators', 'downloads', 'updates'];
 type SortOption = 'downloads' | 'date' | 'trending' | 'relevance';
 type FilterChip = 'all' | 'updates' | 'early-access' | 'installed';
 
@@ -171,6 +174,7 @@ export default function CurseForgeHub({
   onViewModeChange,
 }: CurseForgeHubProps) {
   const { activeProfile, refreshProfiles } = useProfiles();
+  const { game } = useGame();
   const { showToast, updateToast } = useToast();
   const {
     availableUpdates,
@@ -216,12 +220,14 @@ export default function CurseForgeHub({
   }, []);
 
   useEffect(() => {
+    if (!game.curseforgeSlug) return;
+    const gameSlug = game.id === 'sims4' ? undefined : game.curseforgeSlug;
     const loadHome = async () => {
       setIsLoadingHome(true);
       try {
         const [popular, recent] = await Promise.all([
-          searchCurseForgeMods({ pageSize: 8, pageIndex: 0, sortBy: 'popularity' }),
-          searchCurseForgeMods({ pageSize: 8, pageIndex: 0, sortBy: 'date' }),
+          searchCurseForgeMods({ pageSize: 8, pageIndex: 0, sortBy: 'popularity', gameSlug }),
+          searchCurseForgeMods({ pageSize: 8, pageIndex: 0, sortBy: 'date', gameSlug }),
         ]);
         setPopularMods(popular.mods);
         setRecentMods(recent.mods);
@@ -231,10 +237,10 @@ export default function CurseForgeHub({
     };
 
     loadHome().catch((error) => console.error('[CurseForgeHub] Failed to load home:', error));
-  }, []);
+  }, [game.curseforgeSlug, game.id]);
 
   useEffect(() => {
-    if (!selectedCreator) {
+    if (!selectedCreator || !game.curseforgeSlug) {
       setCreatorMods([]);
       return;
     }
@@ -247,6 +253,7 @@ export default function CurseForgeHub({
           pageSize: 50,
           pageIndex: 0,
           sortBy: 'popularity',
+          gameSlug: game.id === 'sims4' ? undefined : game.curseforgeSlug || undefined,
         });
         setCreatorMods(result.mods);
       } finally {
@@ -255,7 +262,7 @@ export default function CurseForgeHub({
     };
 
     loadCreator().catch((error) => console.error('[CurseForgeHub] Failed to load creator:', error));
-  }, [selectedCreator]);
+  }, [selectedCreator, game.id, game.curseforgeSlug]);
 
   const creators = useMemo(() => {
     const map = new Map<number, CurseForgeAuthor>();
@@ -418,6 +425,7 @@ export default function CurseForgeHub({
 
   const tabs: Array<{ id: HubTab; label: string }> = [
     { id: 'home', label: BRANDING.curseforge.home },
+    { id: 'installed', label: 'My Mods' },
     { id: 'favorites', label: BRANDING.curseforge.favorites },
     { id: 'browse', label: BRANDING.curseforge.browse },
     { id: 'creators', label: BRANDING.curseforge.creatorMenu },
@@ -429,11 +437,20 @@ export default function CurseForgeHub({
     <div className="flex min-h-0 flex-1 flex-col min-w-0 overflow-hidden">
       <div className="shrink-0 px-8 pt-7 pb-4">
         <div className="flex items-end justify-between gap-4">
-          <h1 className="text-3xl font-bold text-white">CurseForge</h1>
+          <h1 className="text-3xl font-bold text-white">{game.curseforgeSlug ? 'CurseForge' : game.name}</h1>
           <span className="pb-1 text-xs font-bold uppercase tracking-wide text-brand-green">
             {BUILD_LABEL}
           </span>
         </div>
+        {game.id === 'inzoi' && (
+          <button
+            type="button"
+            onClick={() => void window.electron.ipcRenderer.invoke('shell:openExternal', 'https://canvas.playinzoi.com/en-US/explore')}
+            className="mt-4 inline-flex rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20 cursor-pointer"
+          >
+            Open inZOI Canvas
+          </button>
+        )}
         <div className="mt-5 inline-flex rounded-full bg-white/5 p-2">
           {tabs.map((tab) => (
             <button
@@ -450,7 +467,9 @@ export default function CurseForgeHub({
         </div>
       </div>
 
-      {activeTab === 'browse' && (
+      {!game.curseforgeSlug && (activeTab === 'home' || activeTab === 'browse') && <GameCatalogPanel />}
+
+      {game.curseforgeSlug && activeTab === 'browse' && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <FilterBar
             onSortChange={onSortChange}
@@ -473,7 +492,7 @@ export default function CurseForgeHub({
         </div>
       )}
 
-      {activeTab === 'home' && (
+      {game.curseforgeSlug && activeTab === 'home' && (
         <div className="flex-1 overflow-y-auto px-8 pb-12">
           <div className="mt-4 min-h-48 flex items-center justify-center rounded-lg bg-neutral-950">
             <div className="text-7xl font-bold tracking-tight text-white">curseforge</div>
@@ -488,6 +507,8 @@ export default function CurseForgeHub({
           )}
         </div>
       )}
+
+      {activeTab === 'installed' && <InstalledModsPanel activeProfile={activeProfile} />}
 
       {activeTab === 'favorites' && (
         <div className="flex-1 overflow-y-auto px-8 pb-12">
@@ -752,10 +773,15 @@ export default function CurseForgeHub({
                 <div className="text-3xl font-bold text-brand-green">{updateRows.length}</div>
                 <div className="text-sm text-neutral-400">Ready to update</div>
               </div>
-              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+              <button
+                type="button"
+                onClick={() => setTab('installed')}
+                className="rounded-lg border border-white/10 bg-white/5 p-4 text-left hover:bg-white/10 cursor-pointer"
+              >
                 <div className="text-3xl font-bold text-white">{activeProfile?.mods.length || 0}</div>
                 <div className="text-sm text-neutral-400">Installed total</div>
-              </div>
+                <div className="mt-1 text-xs text-brand-green">Open My Mods</div>
+              </button>
             </div>
 
             <div className="mt-5 overflow-hidden rounded-lg border border-white/10 bg-neutral-900">

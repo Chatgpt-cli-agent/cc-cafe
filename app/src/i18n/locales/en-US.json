@@ -186,6 +186,13 @@
       "mods_not_found": "Mods folder not found",
       "game_path_updated": "Game path updated",
       "mods_path_updated": "Mods path updated",
+      "inzoi_folder": "inZOI folder",
+      "inzoi_folder_placeholder": "Documents/inZOI",
+      "inzoi_folder_hint": "The Documents/inZOI folder. CC Café scans Mods, Canvas, Creations, and My 3D Printer inside it. Leave this empty to use that usual folder.",
+      "paralives_folder": "Paralives mods folder",
+      "paralives_folder_placeholder": "Paralives mods folder",
+      "paralives_folder_hint": "The folder that contains Paralives .mod folders. Leave this empty to use the usual Paralives folders.",
+      "content_path_updated": "Content folder updated",
       "failed_to_save": "Failed to save path"
     },
     "api_keys": {

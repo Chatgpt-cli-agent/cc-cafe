@@ -1,6 +1,7 @@
 'use client';
 
 import { SessionProvider } from '@/components/providers/SessionProvider';
+import { GameProvider } from '@/context/GameContext';
 import { SearchStateProvider } from '@/context/SearchStateContext';
 import { useDevTools } from '@/hooks/useDevTools';
 import { useUpdateChecker } from '@/hooks/useUpdateChecker';
@@ -27,9 +28,11 @@ export function RootLayoutClient({ children }: { children: ReactNode }) {
 
   return (
     <SessionProvider>
-      <SearchStateProvider>
-        <AppWithHooks>{children}</AppWithHooks>
-      </SearchStateProvider>
+      <GameProvider>
+        <SearchStateProvider>
+          <AppWithHooks>{children}</AppWithHooks>
+        </SearchStateProvider>
+      </GameProvider>
     </SessionProvider>
   );
 }

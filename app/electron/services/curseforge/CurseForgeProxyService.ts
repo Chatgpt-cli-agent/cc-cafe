@@ -17,6 +17,7 @@ export interface SearchModsOptions {
   sortBy?: 'downloads' | 'date' | 'popularity' | 'relevance';
   categoryName?: string;
   authorId?: number;
+  gameSlug?: string;
 }
 
 /**
@@ -96,6 +97,7 @@ interface ModProfile {
  */
 export class CurseForgeProxyService {
   private readonly SIMS4_GAME_ID = CurseForgeGameEnum.TheSims4; // 78062
+  private readonly resolvedGameIds = new Map<string, number>();
   private readonly SIMS4_CLASS_IDS = {
     mods: 5089,
     cas: 5339,
@@ -308,20 +310,23 @@ export class CurseForgeProxyService {
     const normalizedQuery = query?.trim() || '';
     const hasTextQuery = normalizedQuery.length > 0;
     const fetchSize = hasTextQuery ? 150 : Math.min(pageSize, 50);
+    const gameId = await this.resolveCurseForgeGameId(normalizedApiKey, options.gameSlug);
     const params: Record<string, string | number> = {
-      gameId: this.SIMS4_GAME_ID,
+      gameId,
       pageSize: Math.min(fetchSize, 50),
       index: hasTextQuery ? 0 : pageIndex * pageSize,
       sortField: this.getSortField(sortBy),
       sortOrder: 'desc',
     };
 
-    const classId = this.getClassIdForCategory(categoryName);
+    const classId = !options.gameSlug || options.gameSlug === 'sims4'
+      ? this.getClassIdForCategory(categoryName)
+      : undefined;
     if (classId) {
       params.classId = classId;
     }
 
-    if (categoryName && !classId) {
+    if (categoryName && !classId && (!options.gameSlug || options.gameSlug === 'sims4')) {
       const categoryId = await this.getCategoryIdByName(normalizedApiKey, categoryName);
       if (categoryId !== undefined) {
         params.categoryId = categoryId;
@@ -438,6 +443,11 @@ export class CurseForgeProxyService {
         liveSearchError = error;
         console.warn('[CurseForge] Live browse failed; falling back to local cache:', error);
       }
+    }
+
+    if (options.gameSlug && options.gameSlug !== 'sims4') {
+      if (liveSearchError instanceof Error) throw liveSearchError;
+      throw new Error('A CurseForge API key is required to browse this game.');
     }
 
     const profileMods = await this.getProfileMods();
@@ -647,6 +657,31 @@ export class CurseForgeProxyService {
    * Converts sort parameter to CurseForge API enum
    * @private
    */
+  private async resolveCurseForgeGameId(apiKey: string, slug?: string): Promise<number> {
+    if (!slug || slug === 'sims4') return this.SIMS4_GAME_ID;
+    const cached = this.resolvedGameIds.get(slug);
+    if (cached) return cached;
+
+    for (let page = 0; page < 40; page += 1) {
+      const response = await axios.get('https://api.curseforge.com/v1/games', {
+        headers: this.getHeaders(apiKey),
+        params: { index: page * 50, pageSize: 50 },
+      });
+      const games = response.data?.data ?? [];
+      const match = games.find((game: { slug?: string; id?: number }) =>
+        String(game.slug || '').toLowerCase() === slug.toLowerCase()
+      );
+      if (match?.id) {
+        const gameId = Number(match.id);
+        this.resolvedGameIds.set(slug, gameId);
+        return gameId;
+      }
+      if (!Array.isArray(games) || games.length < 50) break;
+    }
+
+    throw new Error(`CurseForge has no game named "${slug}".`);
+  }
+
   private getSortField(sortBy: string): CurseForgeModsSearchSortField {
     switch (sortBy) {
       case 'downloads':

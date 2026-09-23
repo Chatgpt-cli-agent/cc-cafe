@@ -111,6 +111,7 @@ export interface SearchModsParams {
   sortBy?: 'downloads' | 'date' | 'popularity' | 'relevance';
   categoryName?: string;
   authorId?: number;
+  gameSlug?: string;
 }
 
 /**
@@ -143,6 +144,9 @@ export async function searchCurseForgeMods(
   }
   if (params.authorId) {
     queryParams.append('authorId', params.authorId.toString());
+  }
+  if (params.gameSlug) {
+    queryParams.append('gameSlug', params.gameSlug);
   }
 
   const queryString = queryParams.toString();

@@ -186,6 +186,13 @@
       "mods_not_found": "Dossier des mods introuvable",
       "game_path_updated": "Chemin du jeu mis à jour",
       "mods_path_updated": "Chemin du dossier des mods mis à jour",
+      "inzoi_folder": "Dossier inZOI",
+      "inzoi_folder_placeholder": "Documents/inZOI",
+      "inzoi_folder_hint": "Le dossier Documents/inZOI. CC Café parcourt Mods, Canvas, Creations et My 3D Printer à l'intérieur. Laissez vide pour utiliser ce dossier habituel.",
+      "paralives_folder": "Dossier de mods Paralives",
+      "paralives_folder_placeholder": "Dossier de mods Paralives",
+      "paralives_folder_hint": "Le dossier qui contient les dossiers .mod de Paralives. Laissez vide pour utiliser les dossiers habituels.",
+      "content_path_updated": "Dossier de contenu mis à jour",
       "failed_to_save": "Échec de la sauvegarde du chemin"
     },
     "api_keys": {

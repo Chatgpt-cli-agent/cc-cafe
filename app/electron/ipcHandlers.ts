@@ -23,6 +23,8 @@ import axios from 'axios';
 import crypto from 'crypto';
 import AdmZip from 'adm-zip';
 import { deployLibraryToGame } from './services/library/LibraryDeployService';
+import { gameContentService } from './services/games/GameContentService';
+import { cafeDexService } from './services/cafedex/CafeDexService';
 
 const execAsync = promisify(exec);
 
@@ -512,6 +514,71 @@ export function registerIpcHandlers() {
   /**
    * CurseForge: Search mods
    */
+  const cafeDexGameSchema = z.enum(['sims4', 'inzoi', 'paralives']);
+  const cafeDexSightingSchema = z.object({
+    key: z.string().min(1).max(500),
+    name: z.string().min(1).max(500),
+    path: z.string().min(1).max(4096),
+    fingerprint: z.number().int().nullable(),
+  });
+
+  ipcMain.handle('cafedex:list', async (_event, { gameId }) => {
+    try {
+      const game = cafeDexGameSchema.parse(gameId);
+      return await cafeDexService.list(game);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('cafedex:sync', async (_event, { gameId, sightings }) => {
+    try {
+      const game = cafeDexGameSchema.parse(gameId);
+      const files = z.array(cafeDexSightingSchema).max(5000).parse(sightings);
+      return await cafeDexService.sync(game, files);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('cafedex:update', async (_event, { gameId, key, broken, note }) => {
+    try {
+      const game = cafeDexGameSchema.parse(gameId);
+      const recordKey = z.string().min(1).max(500).parse(key);
+      const patch = z
+        .object({
+          broken: z.boolean().optional(),
+          note: z.string().max(2000).optional(),
+        })
+        .parse({ broken, note });
+      return await cafeDexService.update(game, recordKey, patch);
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('games:content-roots', async (_event, { gameId, contentRoot }) => {
+    try {
+      return await gameContentService.roots(
+        String(gameId || ''),
+        typeof contentRoot === 'string' ? contentRoot : undefined
+      );
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('games:scan-content', async (_event, { gameId, contentRoot }) => {
+    try {
+      return await gameContentService.scan(
+        String(gameId || ''),
+        typeof contentRoot === 'string' ? contentRoot : undefined
+      );
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('curseforge-search', async (_event, options) => {
     try {
       return await curseForgeProxyService.searchMods(options);

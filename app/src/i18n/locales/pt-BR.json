@@ -186,6 +186,13 @@
       "mods_not_found": "Pasta de mods não encontrada",
       "game_path_updated": "Caminho do jogo atualizado",
       "mods_path_updated": "Caminho da pasta de mods atualizado",
+      "inzoi_folder": "Pasta do inZOI",
+      "inzoi_folder_placeholder": "Documents/inZOI",
+      "inzoi_folder_hint": "A pasta Documents/inZOI. O CC Café verifica Mods, Canvas, Creations e My 3D Printer dentro dela. Deixe vazio para usar essa pasta usual.",
+      "paralives_folder": "Pasta de mods do Paralives",
+      "paralives_folder_placeholder": "Pasta de mods do Paralives",
+      "paralives_folder_hint": "A pasta que contém as pastas .mod do Paralives. Deixe vazio para usar as pastas usuais.",
+      "content_path_updated": "Pasta de conteúdo atualizada",
       "failed_to_save": "Falha ao salvar caminho"
     },
     "api_keys": {

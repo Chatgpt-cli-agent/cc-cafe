@@ -8,6 +8,7 @@ import { searchCurseForgeMods } from '@/lib/curseforgeApi';
 import { getBatchWarningStatus } from '@/lib/fakeDetectionApi';
 import { userPreferencesService } from '@/lib/services/UserPreferencesService';
 import { getCompatSessionStorageItem, setCompatSessionStorageItem } from '@/lib/utils/storageCompat';
+import { useGame } from '@/context/GameContext';
 import { CurseForgeMod } from '@/types/curseforge';
 import { ViewMode } from '@/hooks/useViewMode';
 import { useSearchState } from '@/context/SearchStateContext';
@@ -64,6 +65,8 @@ function appendUniqueMods(existing: CurseForgeMod[], incoming: CurseForgeMod[]) 
 
 export default function ModList({ searchQuery, sortBy, category, authorId, viewMode, activeFilter = 'all', scrollIndex = 0 }: ModListProps) {
   const { t } = useTranslation();
+  const { game } = useGame();
+  const gameSlug = game.id === 'sims4' ? undefined : game.curseforgeSlug || undefined;
   const { resetScrollIndex, setScrollIndex, setCacheKey, setCachedModsCount } = useSearchState();
   const [mods, setMods] = useState<CurseForgeMod[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -145,8 +148,9 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
       normalizedCategory.toLowerCase(),
       authorId ?? 'all',
       activeFilter,
+      game.id,
     ].join('|');
-  }, [searchQuery, apiSortBy, normalizedCategory, authorId, activeFilter]);
+  }, [searchQuery, apiSortBy, normalizedCategory, authorId, activeFilter, game.id]);
 
   const readCachedSearchResult = useCallback((cacheKey: string): CachedSearchResult | null => {
     try {
@@ -196,6 +200,7 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
       sortBy: apiSortBy as 'downloads' | 'date' | 'popularity' | 'relevance',
       categoryName: normalizedCategory || undefined,
       authorId,
+      gameSlug,
     };
 
     try {
@@ -233,7 +238,7 @@ export default function ModList({ searchQuery, sortBy, category, authorId, viewM
         setIsLoadingMore(false);
       }
     }
-  }, [searchQuery, apiSortBy, normalizedCategory, authorId, saveCachedSearchResult, searchCacheKey]);
+  }, [searchQuery, apiSortBy, normalizedCategory, authorId, gameSlug, saveCachedSearchResult, searchCacheKey]);
 
   // Load first page when query or sort changes
   useEffect(() => {

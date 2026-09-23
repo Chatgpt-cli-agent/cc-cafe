@@ -186,6 +186,13 @@
       "mods_not_found": "मॉड्स फ़ोल्डर नहीं मिला",
       "game_path_updated": "गेम पथ अपडेट हो गया",
       "mods_path_updated": "मॉड्स पथ अपडेट हो गया",
+      "inzoi_folder": "inZOI फ़ोल्डर",
+      "inzoi_folder_placeholder": "Documents/inZOI",
+      "inzoi_folder_hint": "Documents/inZOI फ़ोल्डर। CC Café इसके अंदर Mods, Canvas, Creations और My 3D Printer देखता है। सामान्य फ़ोल्डर के लिए इसे खाली छोड़ें।",
+      "paralives_folder": "Paralives मॉड्स फ़ोल्डर",
+      "paralives_folder_placeholder": "Paralives मॉड्स फ़ोल्डर",
+      "paralives_folder_hint": "वह फ़ोल्डर जिसमें Paralives की .mod फ़ोल्डरें हैं। सामान्य फ़ोल्डरों के लिए इसे खाली छोड़ें।",
+      "content_path_updated": "कंटेंट फ़ोल्डर अपडेट हो गया",
       "failed_to_save": "पथ सहेजने में विफल"
     },
     "api_keys": {

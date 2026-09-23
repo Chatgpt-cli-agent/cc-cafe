@@ -9,6 +9,8 @@ CurseForge "Save Files" downloads (e.g. "Ultimate Saves") are installed into `Do
 ## What It Does
 
 - CurseForge browse, creators, downloads, and updates
+- Game switcher for The Sims 4, inZOI (CurseForge and Canvas), and Paralives (Steam Workshop `.mod` folders). Settings can point at the inZOI folder and the Paralives mods folder; empty paths keep the usual locations. Sims 4 package tools stay on The Sims 4.
+- CafeDex records scanned mods by fingerprint, a broken mark, and a personal note. The package files stay in the game folder.
 - Dedicated Favorites panel for followed creators (separate from Counter / Fresh Picks)
 - Dense S4MM-style Menu grid (square tiles with installed checkmarks)
 - Local mod import (.package, .ts4script, .zip, .rar) and profile management

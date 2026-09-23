@@ -4,6 +4,8 @@ export interface FingerprintedFile {
   path: string;
   name: string;
   fingerprint: number;
+  source?: string | null;
+  sourceEvidence?: 'link' | 'filename' | 'folder' | null;
 }
 
 export interface FingerprintMatch {

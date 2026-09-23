@@ -186,6 +186,13 @@
       "mods_not_found": "Carpeta de mods no encontrada",
       "game_path_updated": "Ruta del juego actualizada",
       "mods_path_updated": "Ruta de la carpeta de mods actualizada",
+      "inzoi_folder": "Carpeta de inZOI",
+      "inzoi_folder_placeholder": "Documents/inZOI",
+      "inzoi_folder_hint": "La carpeta Documents/inZOI. CC Café revisa Mods, Canvas, Creations y My 3D Printer dentro de ella. Déjala vacía para usar esa carpeta habitual.",
+      "paralives_folder": "Carpeta de mods de Paralives",
+      "paralives_folder_placeholder": "Carpeta de mods de Paralives",
+      "paralives_folder_hint": "La carpeta que contiene las carpetas .mod de Paralives. Déjala vacía para usar las carpetas habituales.",
+      "content_path_updated": "Carpeta de contenido actualizada",
       "failed_to_save": "No se pudo guardar la ruta"
     },
     "api_keys": {

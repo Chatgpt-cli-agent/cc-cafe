@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import Layout from '@/components/layouts/Layout';
+import { useGame } from '@/context/GameContext';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import {
   filesystemToolsService,
@@ -320,6 +321,7 @@ function SectionCard({
 }
 
 export default function ToolsPage() {
+  const { game } = useGame();
   const { showToast, dismissToast } = useToast();
   const [compactView, setCompactView] = useState(true);
   const [modsPath, setModsPath] = useState<string | null>(null);
@@ -535,6 +537,7 @@ export default function ToolsPage() {
               </h1>
               <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
                 CC Café file maintenance tools for the Sims 4 Mods folder.
+                {game.id !== 'sims4' ? ` These tools stay on The Sims 4. ${game.name} uses its own catalog and content folders.` : ''}
               </p>
             </div>
 

@@ -186,6 +186,13 @@
       "mods_not_found": "未找到模组文件夹",
       "game_path_updated": "游戏路径已更新",
       "mods_path_updated": "模组路径已更新",
+      "inzoi_folder": "inZOI 文件夹",
+      "inzoi_folder_placeholder": "Documents/inZOI",
+      "inzoi_folder_hint": "Documents/inZOI 文件夹。CC Café 会扫描其中的 Mods、Canvas、Creations 和 My 3D Printer。留空则使用这个默认文件夹。",
+      "paralives_folder": "Paralives 模组文件夹",
+      "paralives_folder_placeholder": "Paralives 模组文件夹",
+      "paralives_folder_hint": "包含 Paralives .mod 文件夹的目录。留空则使用默认文件夹。",
+      "content_path_updated": "内容文件夹已更新",
       "failed_to_save": "保存路径失败"
     },
     "api_keys": {

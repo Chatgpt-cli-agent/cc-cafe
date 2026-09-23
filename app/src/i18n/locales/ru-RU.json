@@ -186,6 +186,13 @@
       "mods_not_found": "Папка модов не найдена",
       "game_path_updated": "Путь к игре обновлен",
       "mods_path_updated": "Путь к папке модов обновлен",
+      "inzoi_folder": "Папка inZOI",
+      "inzoi_folder_placeholder": "Documents/inZOI",
+      "inzoi_folder_hint": "Папка Documents/inZOI. CC Café просматривает внутри неё Mods, Canvas, Creations и My 3D Printer. Оставьте пустым, чтобы использовать обычную папку.",
+      "paralives_folder": "Папка модов Paralives",
+      "paralives_folder_placeholder": "Папка модов Paralives",
+      "paralives_folder_hint": "Папка, в которой лежат папки .mod Paralives. Оставьте пустым, чтобы использовать обычные папки.",
+      "content_path_updated": "Папка контента обновлена",
       "failed_to_save": "Не удалось сохранить путь"
     },
     "api_keys": {

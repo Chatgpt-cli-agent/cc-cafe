@@ -1,5 +1,7 @@
+import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
+import { detectModSource } from './modSource';
 import { walkFiles } from './walkPackages';
 
 const { Fingerprint } = require('../../core2/Fingerprint');
@@ -11,6 +13,8 @@ export interface FingerprintedFile {
   path: string;
   name: string;
   fingerprint: number;
+  source: string | null;
+  sourceEvidence: 'link' | 'filename' | 'folder' | null;
 }
 
 export interface FingerprintMatch {
@@ -48,12 +52,19 @@ export class FingerprintService {
 
     for (const filePath of files) {
       try {
-        const fingerprint = Fingerprint.computeFile(filePath);
+        const buffer = fs.readFileSync(filePath);
+        const fingerprint = Fingerprint.computeBuffer(buffer);
+        const sourceHit = detectModSource({
+          relativePath: path.relative(rootPath, filePath),
+          bytes: buffer,
+        });
         if (typeof fingerprint === 'number' && fingerprint > 0) {
           results.push({
             path: path.dirname(filePath),
             name: path.basename(filePath),
             fingerprint,
+            source: sourceHit?.label ?? null,
+            sourceEvidence: sourceHit?.evidence ?? null,
           });
         }
       } catch (error) {
